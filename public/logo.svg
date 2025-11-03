@@ -1,0 +1,15 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="256" height="256" rx="48" fill="#0b0b10"/>
+<g filter="url(#f0)">
+<path d="M64 180V76h28l36 52 36-52h28v104h-26V120l-38 54-38-54v60H64z" fill="#3a6cf4"/>
+</g>
+<defs>
+<filter id="f0" x="0" y="0" width="256" height="256" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feGaussianBlur stdDeviation="8" result="blur"/>
+<feMerge>
+<feMergeNode in="blur"/>
+<feMergeNode in="SourceGraphic"/>
+</feMerge>
+</filter>
+</defs>
+</svg>

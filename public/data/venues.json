@@ -1,0 +1,88 @@
+[
+  {
+    "venue_id": "v001",
+    "name": "Laneway Latte",
+    "type": "Cafe",
+    "city": "Melbourne",
+    "price_avg": 18,
+    "vibes": [
+      "cozy",
+      "quiet",
+      "study-friendly",
+      "indie"
+    ],
+    "address": "12 Degraves St, Melbourne",
+    "map_url": "https://maps.google.com/?q=12+Degraves+St+Melbourne"
+  },
+  {
+    "venue_id": "v002",
+    "name": "Rooftop Republic",
+    "type": "Bar",
+    "city": "Melbourne",
+    "price_avg": 28,
+    "vibes": [
+      "views",
+      "romantic",
+      "evening",
+      "vibrant"
+    ],
+    "address": "252 Swanston St, Melbourne",
+    "map_url": "https://maps.google.com/?q=252+Swanston+St+Melbourne"
+  },
+  {
+    "venue_id": "v003",
+    "name": "Hidden Noodles",
+    "type": "Restaurant",
+    "city": "Melbourne",
+    "price_avg": 22,
+    "vibes": [
+      "casual",
+      "late-night",
+      "cheap eats"
+    ],
+    "address": "88 Collins St, Melbourne",
+    "map_url": "https://maps.google.com/?q=88+Collins+St+Melbourne"
+  },
+  {
+    "venue_id": "v004",
+    "name": "Vinyl Vibes",
+    "type": "Cafe",
+    "city": "Fitzroy",
+    "price_avg": 20,
+    "vibes": [
+      "indie",
+      "retro",
+      "cozy",
+      "artsy"
+    ],
+    "address": "48 Gertrude St, Fitzroy",
+    "map_url": "https://maps.google.com/?q=48+Gertrude+St+Fitzroy"
+  },
+  {
+    "venue_id": "v005",
+    "name": "Night Owl Espresso",
+    "type": "Cafe",
+    "city": "Carlton",
+    "price_avg": 16,
+    "vibes": [
+      "late-night",
+      "cozy"
+    ],
+    "address": "199 Lygon St, Carlton",
+    "map_url": "https://maps.google.com/?q=199+Lygon+St+Carlton"
+  },
+  {
+    "venue_id": "v006",
+    "name": "Arcade Arcade",
+    "type": "Bar",
+    "city": "Melbourne",
+    "price_avg": 24,
+    "vibes": [
+      "retro",
+      "vibrant",
+      "group fun"
+    ],
+    "address": "100 Queen St, Melbourne",
+    "map_url": "https://maps.google.com/?q=100+Queen+St+Melbourne"
+  }
+]
