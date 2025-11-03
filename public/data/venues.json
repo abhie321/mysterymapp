@@ -1,88 +1,152 @@
 [
   {
-    "venue_id": "v001",
-    "name": "Laneway Latte",
-    "type": "Cafe",
-    "city": "Melbourne",
-    "price_avg": 18,
-    "vibes": [
-      "cozy",
-      "quiet",
-      "study-friendly",
-      "indie"
-    ],
-    "address": "12 Degraves St, Melbourne",
-    "map_url": "https://maps.google.com/?q=12+Degraves+St+Melbourne"
-  },
-  {
-    "venue_id": "v002",
-    "name": "Rooftop Republic",
+    "name": "Ponyfish Island",
     "type": "Bar",
-    "city": "Melbourne",
-    "price_avg": 28,
-    "vibes": [
-      "views",
-      "romantic",
-      "evening",
-      "vibrant"
-    ],
-    "address": "252 Swanston St, Melbourne",
-    "map_url": "https://maps.google.com/?q=252+Swanston+St+Melbourne"
+    "vibe": ["Scenic", "Hidden"],
+    "budget": "$$",
+    "location": "Under Princes Bridge, Southbank VIC",
+    "description": "A floating bar tucked under the bridge with unmatched riverside views.",
+    "mapUrl": "https://goo.gl/maps/zpNZYhBbyo3GJpFX8",
+    "imageUrl": "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=900&q=60"
   },
   {
-    "venue_id": "v003",
-    "name": "Hidden Noodles",
+    "name": "Hardware Société",
+    "type": "Brunch Spot",
+    "vibe": ["Cozy", "Trendy"],
+    "budget": "$$",
+    "location": "10 Katherine Pl, Melbourne VIC",
+    "description": "Parisian-style brunch cafe known for baked eggs and top-tier coffee.",
+    "mapUrl": "https://goo.gl/maps/3XqzqEXjRtq5R8v47",
+    "imageUrl": "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=900&q=60"
+  },
+  {
+    "name": "Loop Roof",
+    "type": "Bar",
+    "vibe": ["Rooftop", "Lively"],
+    "budget": "$$$",
+    "location": "23 Meyers Pl, Melbourne VIC",
+    "description": "Rooftop bar with lush greenery, panoramic views, and botanical cocktails.",
+    "mapUrl": "https://goo.gl/maps/fQkABYMbCrM2",
+    "imageUrl": "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=900&q=60"
+  },
+  {
+    "name": "Section 8",
+    "type": "Bar",
+    "vibe": ["Street", "Casual"],
+    "budget": "$$",
+    "location": "27-29 Tattersalls Ln, Melbourne VIC",
+    "description": "Graffiti-covered open-air bar built from shipping containers, known for DJs and drinks.",
+    "mapUrl": "https://goo.gl/maps/1gPYmA9RpQwDkCPf8",
+    "imageUrl": "https://images.unsplash.com/photo-1567446537708-1c90ca33c8b1?auto=format&fit=crop&w=900&q=60"
+  },
+  {
+    "name": "Cathedral Coffee",
+    "type": "Cafe",
+    "vibe": ["Minimal", "Calm"],
+    "budget": "$",
+    "location": "Level 1 Cathedral Arcade, 37 Swanston St, Melbourne VIC",
+    "description": "Tiny espresso bar hidden in Cathedral Arcade with perfect morning light.",
+    "mapUrl": "https://goo.gl/maps/Ww5jPrzjCxu1sMFA6",
+    "imageUrl": "https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?auto=format&fit=crop&w=900&q=60"
+  },
+  {
+    "name": "Siglo",
+    "type": "Bar",
+    "vibe": ["Elegant", "Rooftop"],
+    "budget": "$$$",
+    "location": "161 Spring St, Melbourne VIC",
+    "description": "Classic European rooftop bar overlooking Parliament House with old-world charm.",
+    "mapUrl": "https://goo.gl/maps/yxvBmgdVBgGxQAhY9",
+    "imageUrl": "https://images.unsplash.com/photo-1532634896-26909d0d4b89?auto=format&fit=crop&w=900&q=60"
+  },
+  {
+    "name": "The Moat",
+    "type": "Bar & Bistro",
+    "vibe": ["Bookish", "Intimate"],
+    "budget": "$$",
+    "location": "Basement State Library, 176 Little Lonsdale St, Melbourne VIC",
+    "description": "Hidden literary-inspired bar tucked beneath the State Library.",
+    "mapUrl": "https://goo.gl/maps/hkN1YYmFV8mynz8Z6",
+    "imageUrl": "https://images.unsplash.com/photo-1551024601-bec78aea704b?auto=format&fit=crop&w=900&q=60"
+  },
+  {
+    "name": "Manchester Press",
+    "type": "Cafe",
+    "vibe": ["Industrial", "Cozy"],
+    "budget": "$$",
+    "location": "8 Rankins Ln, Melbourne VIC",
+    "description": "Warehouse-style cafe known for bagels, great coffee, and laidback charm.",
+    "mapUrl": "https://goo.gl/maps/5DuvUQ19YgR2",
+    "imageUrl": "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=900&q=60"
+  },
+  {
+    "name": "Bar Americano",
+    "type": "Cocktail Bar",
+    "vibe": ["Classic", "Hidden"],
+    "budget": "$$$",
+    "location": "20 Presgrave Pl, Melbourne VIC",
+    "description": "Tiny standing-room-only cocktail bar, considered one of Melbourne’s best-kept secrets.",
+    "mapUrl": "https://goo.gl/maps/nTWytxHRMJr",
+    "imageUrl": "https://images.unsplash.com/photo-1570784336018-4b29c8a56b7c?auto=format&fit=crop&w=900&q=60"
+  },
+  {
+    "name": "Rooftop at QT",
+    "type": "Bar",
+    "vibe": ["Luxury", "Trendy"],
+    "budget": "$$$",
+    "location": "Level 11, 133 Russell St, Melbourne VIC",
+    "description": "Upscale rooftop bar with designer vibes, creative cocktails, and city skyline views.",
+    "mapUrl": "https://goo.gl/maps/B3C78bQqF9K2",
+    "imageUrl": "https://images.unsplash.com/photo-1543900694-133f37abaaa5?auto=format&fit=crop&w=900&q=60"
+  },
+  {
+    "name": "The Kettle Black",
+    "type": "Brunch Spot",
+    "vibe": ["Bright", "Modern"],
+    "budget": "$$",
+    "location": "50 Albert Rd, South Melbourne VIC",
+    "description": "Architecturally stunning brunch destination with creative dishes and a sunlit interior.",
+    "mapUrl": "https://goo.gl/maps/keYH4k2y7Lk",
+    "imageUrl": "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?auto=format&fit=crop&w=900&q=60"
+  },
+  {
+    "name": "Kisumé",
     "type": "Restaurant",
-    "city": "Melbourne",
-    "price_avg": 22,
-    "vibes": [
-      "casual",
-      "late-night",
-      "cheap eats"
-    ],
-    "address": "88 Collins St, Melbourne",
-    "map_url": "https://maps.google.com/?q=88+Collins+St+Melbourne"
+    "vibe": ["Refined", "Minimal"],
+    "budget": "$$$$",
+    "location": "175 Flinders Ln, Melbourne VIC",
+    "description": "Modern Japanese restaurant blending fine dining with sleek Melbourne minimalism.",
+    "mapUrl": "https://goo.gl/maps/jbMDC2rVw7C2",
+    "imageUrl": "https://images.unsplash.com/photo-1525610553991-2bede1a236e2?auto=format&fit=crop&w=900&q=60"
   },
   {
-    "venue_id": "v004",
-    "name": "Vinyl Vibes",
-    "type": "Cafe",
-    "city": "Fitzroy",
-    "price_avg": 20,
-    "vibes": [
-      "indie",
-      "retro",
-      "cozy",
-      "artsy"
-    ],
-    "address": "48 Gertrude St, Fitzroy",
-    "map_url": "https://maps.google.com/?q=48+Gertrude+St+Fitzroy"
+    "name": "Flinders Lane Gallery",
+    "type": "Gallery",
+    "vibe": ["Creative", "Quiet"],
+    "budget": "$",
+    "location": "137 Flinders Ln, Melbourne VIC",
+    "description": "A serene contemporary art gallery showcasing emerging Australian artists.",
+    "mapUrl": "https://goo.gl/maps/ggVtXzMGNxs",
+    "imageUrl": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=900&q=60"
   },
   {
-    "venue_id": "v005",
-    "name": "Night Owl Espresso",
-    "type": "Cafe",
-    "city": "Carlton",
-    "price_avg": 16,
-    "vibes": [
-      "late-night",
-      "cozy"
-    ],
-    "address": "199 Lygon St, Carlton",
-    "map_url": "https://maps.google.com/?q=199+Lygon+St+Carlton"
-  },
-  {
-    "venue_id": "v006",
-    "name": "Arcade Arcade",
+    "name": "Chuckle Park",
     "type": "Bar",
-    "city": "Melbourne",
-    "price_avg": 24,
-    "vibes": [
-      "retro",
-      "vibrant",
-      "group fun"
-    ],
-    "address": "100 Queen St, Melbourne",
-    "map_url": "https://maps.google.com/?q=100+Queen+St+Melbourne"
+    "vibe": ["Whimsical", "Laneway"],
+    "budget": "$$",
+    "location": "322 Little Collins St, Melbourne VIC",
+    "description": "A tiny fairy-light-filled laneway bar serving cocktails and tapas from a caravan.",
+    "mapUrl": "https://goo.gl/maps/f8StNdm6xCo",
+    "imageUrl": "https://images.unsplash.com/photo-1543087903-1ac2ec7aa8c5?auto=format&fit=crop&w=900&q=60"
+  },
+  {
+    "name": "Storyville",
+    "type": "Bar",
+    "vibe": ["Fantasy", "Lively"],
+    "budget": "$$",
+    "location": "185 Lonsdale St, Melbourne VIC",
+    "description": "Whimsical bar inspired by fairy tales, complete with giant mushrooms and glowing lights.",
+    "mapUrl": "https://goo.gl/maps/WvqMhbzCEAL2",
+    "imageUrl": "https://images.unsplash.com/photo-1601924582971-c9c7a0d91f99?auto=format&fit=crop&w=900&q=60"
   }
 ]
