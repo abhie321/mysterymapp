@@ -1,6 +1,8 @@
+
 import type { Metadata } from "next"
 import "../styles/globals.css"
 import Image from "next/image"
+import WaitlistBar from "./WaitlistBar"
 
 export const metadata: Metadata = {
   title: "MysteryMapp — Hidden Gems Near You",
@@ -12,6 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <header className="container py-8 flex items-center gap-3">
+          <WaitlistBar />
           <Image src="/logo.svg" alt="MysteryMapp" width={40} height={40} className="rounded-xl shadow-glow"/>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">MysteryMapp <span className="text-subtext text-base align-super">alpha</span></h1>
