@@ -3,16 +3,17 @@
 import { useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MapPin, Sparkles } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
 
 type Venue = {
   venue_id?: string
   name: string
   type: string
   city?: string
-  price_avg?: number          // our original numeric budget
-  budget?: string             // "$", "$$", "$$$" from your new data
-  vibes?: string[]            // plural (our original)
-  vibe?: string[]             // singular (some entries had this)
+  price_avg?: number          // legacy numeric budget
+  budget?: string             // "$", "$$", "$$$"
+  vibes?: string[]            // plural
+  vibe?: string[]             // singular (fallback)
   address?: string
   location?: string
   map_url?: string
@@ -30,11 +31,40 @@ export default function Page() {
   const [budget, setBudget] = useState<number>(25)
   const [submitted, setSubmitted] = useState(false)
 
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Load data
   useEffect(() => {
     fetch("/data/venues.json").then(r => r.json()).then(setVenues)
   }, [])
 
-  // Unique vibes from dataset (lowercased), fallback to defaults
+  // Read initial state from URL (once)
+  useEffect(() => {
+    const v = searchParams.get("v")?.split(",").filter(Boolean) ?? []
+    const t = searchParams.get("t")?.split("|").filter(Boolean) ?? []
+    const b = Number(searchParams.get("b"))
+    const go = searchParams.get("go") === "1"
+
+    if (v.length) setVibes(v)
+    if (t.length) setTypes(t)
+    if (!Number.isNaN(b) && b > 0) setBudget(b)
+    if (go) setSubmitted(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Keep URL in sync with state
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (vibes.length) params.set("v", vibes.join(","))
+    if (types.length) params.set("t", types.join("|"))
+    if (budget) params.set("b", String(budget))
+    if (submitted) params.set("go", "1")
+    const qs = params.toString()
+    router.replace(qs ? `/?${qs}` : "/", { scroll: false })
+  }, [vibes, types, budget, submitted, router])
+
+  // Build available vibes from dataset (fallback to defaults)
   const dataVibes = useMemo(() => {
     const s = new Set<string>()
     venues.forEach(v => {
@@ -45,7 +75,7 @@ export default function Page() {
   }, [venues])
   const ALL_VIBES = dataVibes.length ? dataVibes : [...DEFAULT_VIBES]
 
-  // Unique types from dataset, fallback to our original 3
+  // Build types from dataset (fallback to Cafe/Bar/Restaurant)
   const ALL_TYPES = useMemo(() => {
     const s = new Set<string>()
     venues.forEach(v => v.type && s.add(v.type))
@@ -71,7 +101,7 @@ export default function Page() {
 
       const typeScore = types.length === 0 ? 0.5 : (types.includes(venue.type) ? 1 : 0)
 
-      // If numeric price_avg isn't present, don't penalize (treat as OK)
+      // If numeric price_avg isn't present, treat as OK
       const budgetOK = typeof venue.price_avg === "number" ? (venue.price_avg <= budget ? 1 : 0) : 1
 
       return +(0.6 * vibeScore + 0.25 * typeScore + 0.15 * budgetOK).toFixed(2)
@@ -87,6 +117,7 @@ export default function Page() {
   return (
     <main className="container pb-16">
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Left controls */}
         <motion.div layout className="card md:col-span-1">
           <h2 className="text-lg font-semibold mb-3">Your vibe</h2>
 
@@ -135,10 +166,14 @@ export default function Page() {
           </button>
         </motion.div>
 
+        {/* Results */}
         <motion.div layout className="card md:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">Hidden Gems Near You</h2>
-            <span className="badge">{submitted ? results.length : 0} picks</span>
+            <div className="flex items-center gap-2">
+              <span className="badge">{submitted ? results.length : 0} picks</span>
+              <ShareButton />
+            </div>
           </div>
 
           <AnimatePresence mode="popLayout">
@@ -165,7 +200,6 @@ export default function Page() {
                       ) : (
                         <div className="w-full h-full bg-[radial-gradient(circle_at_30%_30%,rgba(58,108,244,0.15),transparent_60%)]" />
                       )}
-                      {/* subtle gradient overlay for readability */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent" />
                     </div>
 
@@ -219,6 +253,31 @@ function SaveButton({ id }: { id: string }) {
       className={`btn ${saved ? "" : "btn-primary"}`}
     >
       {saved ? "Saved ✓" : "Save"}
+    </button>
+  )
+}
+
+function ShareButton() {
+  const [ok, setOk] = useState(false)
+  return (
+    <button
+      className="btn"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(window.location.href)
+          setOk(true)
+          setTimeout(() => setOk(false), 1500)
+        } catch {
+          const input = document.createElement("input")
+          input.value = window.location.href
+          document.body.appendChild(input); input.select()
+          document.execCommand("copy"); document.body.removeChild(input)
+          setOk(true); setTimeout(() => setOk(false), 1500)
+        }
+      }}
+      title="Copy a link to these results"
+    >
+      {ok ? "Copied ✓" : "Share"}
     </button>
   )
 }
