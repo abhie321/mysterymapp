@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MapPin, Sparkles } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -10,10 +10,10 @@ type Venue = {
   name: string
   type: string
   city?: string
-  price_avg?: number          // legacy numeric budget
-  budget?: string             // "$", "$$", "$$$"
-  vibes?: string[]            // plural
-  vibe?: string[]             // singular (fallback)
+  price_avg?: number
+  budget?: string
+  vibes?: string[]
+  vibe?: string[]
   address?: string
   location?: string
   map_url?: string
@@ -25,6 +25,14 @@ type Venue = {
 const DEFAULT_VIBES = ["cozy","indie","quiet","vibrant","romantic","retro","artsy","hidden","minimalist","aesthetic","late-night","views","casual"] as const;
 
 export default function Page() {
+  return (
+    <Suspense fallback={<main className="container py-12 text-subtext">Loading…</main>}>
+      <PageContent />
+    </Suspense>
+  )
+}
+
+function PageContent() {
   const [venues, setVenues] = useState<Venue[]>([])
   const [vibes, setVibes] = useState<string[]>([])
   const [types, setTypes] = useState<string[]>([])
@@ -97,13 +105,9 @@ export default function Page() {
       const rawVibes = (venue.vibes ?? venue.vibe ?? []) as string[]
       const vSet = new Set(rawVibes.map(v => v.toLowerCase()))
       const vibeMatches = vibes.reduce((a, v) => a + (vSet.has(v) ? 1 : 0), 0)
-      const vibeScore = Math.min(1, vibeMatches / 2) // up to 1.0
-
+      const vibeScore = Math.min(1, vibeMatches / 2)
       const typeScore = types.length === 0 ? 0.5 : (types.includes(venue.type) ? 1 : 0)
-
-      // If numeric price_avg isn't present, treat as OK
       const budgetOK = typeof venue.price_avg === "number" ? (venue.price_avg <= budget ? 1 : 0) : 1
-
       return +(0.6 * vibeScore + 0.25 * typeScore + 0.15 * budgetOK).toFixed(2)
     }
 
@@ -270,9 +274,12 @@ function ShareButton() {
         } catch {
           const input = document.createElement("input")
           input.value = window.location.href
-          document.body.appendChild(input); input.select()
-          document.execCommand("copy"); document.body.removeChild(input)
-          setOk(true); setTimeout(() => setOk(false), 1500)
+          document.body.appendChild(input)
+          input.select()
+          document.execCommand("copy")
+          document.body.removeChild(input)
+          setOk(true)
+          setTimeout(() => setOk(false), 1500)
         }
       }}
       title="Copy a link to these results"
