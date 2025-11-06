@@ -34,6 +34,8 @@ export default function Page() {
 
 function PageContent() {
   const [venues, setVenues] = useState<Venue[]>([])
+  const [loadingData, setLoadingData] = useState(true)
+
   const [vibes, setVibes] = useState<string[]>([])
   const [types, setTypes] = useState<string[]>([])
   const [budget, setBudget] = useState<number>(25)
@@ -44,7 +46,15 @@ function PageContent() {
 
   // Load data
   useEffect(() => {
-    fetch("/data/venues.json").then(r => r.json()).then(setVenues)
+    ;(async () => {
+      try {
+        const r = await fetch("/data/venues.json")
+        const j = await r.json()
+        setVenues(j)
+      } finally {
+        setLoadingData(false)
+      }
+    })()
   }, [])
 
   // Read initial state from URL (once)
@@ -53,7 +63,6 @@ function PageContent() {
     const t = searchParams.get("t")?.split("|").filter(Boolean) ?? []
     const b = Number(searchParams.get("b"))
     const go = searchParams.get("go") === "1"
-
     if (v.length) setVibes(v)
     if (t.length) setTypes(t)
     if (!Number.isNaN(b) && b > 0) setBudget(b)
@@ -182,7 +191,13 @@ function PageContent() {
 
           <AnimatePresence mode="popLayout">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {submitted ? results.map(({ v, s }) => {
+              {/* Skeletons while loading */}
+              {submitted && loadingData && Array.from({ length: 6 }).map((_, i) => (
+                <SkeletonCard key={`sk-${i}`} />
+              ))}
+
+              {/* Real results */}
+              {submitted && !loadingData ? results.map(({ v, s }) => {
                 const img = getImage(v)
                 const tags = ((v.vibes ?? v.vibe ?? []) as string[]).slice(0, 3)
                 const price = typeof v.price_avg === "number" ? `$${v.price_avg}` : (v.budget || "")
@@ -196,11 +211,12 @@ function PageContent() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.25 }}
-                    className="relative overflow-hidden rounded-2xl border border-border"
+                    whileHover={{ y: -4 }}
+                    className="group relative overflow-hidden rounded-2xl border border-border"
                   >
                     <div className="relative aspect-[16/10] overflow-hidden">
                       {img ? (
-                        <img src={img} alt={v.name} className="w-full h-full object-cover" />
+                        <ImageWithBlur src={img} alt={v.name} />
                       ) : (
                         <div className="w-full h-full bg-[radial-gradient(circle_at_30%_30%,rgba(58,108,244,0.15),transparent_60%)]" />
                       )}
@@ -230,7 +246,9 @@ function PageContent() {
                     </div>
                   </motion.article>
                 )
-              }) : (
+              }) : null}
+
+              {!submitted && !loadingData && (
                 <div className="opacity-60 text-subtext">Pick a few vibes and tap “Show my hidden gems”.</div>
               )}
             </div>
@@ -286,5 +304,37 @@ function ShareButton() {
     >
       {ok ? "Copied ✓" : "Share"}
     </button>
+  )
+}
+
+/** Visual polish bits */
+
+function SkeletonCard() {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border">
+      <div className="relative aspect-[16/10] bg-border animate-pulse" />
+      <div className="p-4 space-y-2">
+        <div className="h-4 w-1/2 bg-border animate-pulse rounded" />
+        <div className="h-3 w-1/3 bg-border animate-pulse rounded" />
+        <div className="flex gap-2 mt-2">
+          <div className="h-5 w-14 bg-border animate-pulse rounded-full" />
+          <div className="h-5 w-16 bg-border animate-pulse rounded-full" />
+        </div>
+        <div className="h-8 w-24 bg-border animate-pulse rounded-xl mt-3" />
+      </div>
+    </div>
+  )
+}
+
+function ImageWithBlur({ src, alt }: { src: string, alt: string }) {
+  const [loaded, setLoaded] = useState(false)
+  return (
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      onLoad={() => setLoaded(true)}
+      className={`w-full h-full object-cover transition-transform duration-300 ${loaded ? 'blur-0' : 'blur-sm'} group-hover:scale-105`}
+    />
   )
 }
