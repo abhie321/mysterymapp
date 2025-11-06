@@ -23,6 +23,65 @@ type Venue = {
 }
 
 const DEFAULT_VIBES = ["cozy","indie","quiet","vibrant","romantic","retro","artsy","hidden","minimalist","aesthetic","late-night","views","casual"] as const;
+const SHEET_CSV = process.env.NEXT_PUBLIC_SHEET_CSV
+
+/** ---------------- CSV helpers (for Google Sheets publish-to-web CSV) ---------------- **/
+
+// Tiny CSV parser that handles quoted commas and newlines.
+function parseCSV(text: string): Record<string, string>[] {
+  const rows: string[][] = []
+  let row: string[] = ['']
+  let col = 0
+  let inQuotes = false
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (ch === '"') {
+      // Handle double quotes inside quoted field ("")
+      const next = text[i + 1]
+      if (inQuotes && next === '"') { row[col] += '"'; i++; continue }
+      inQuotes = !inQuotes
+      continue
+    }
+    if (ch === ',' && !inQuotes) { row.push(''); col++; continue }
+    if ((ch === '\n' || ch === '\r') && !inQuotes) {
+      // swallow \r\n pairs
+      if (ch === '\r' && text[i+1] === '\n') i++
+      rows.push(row); row = ['']; col = 0; continue
+    }
+    row[col] += ch
+  }
+  if (row.some(cell => cell !== '')) rows.push(row)
+
+  const header = (rows.shift() ?? []).map(h => h.trim())
+  return rows
+    .filter(r => r.some(c => c && c.trim()))
+    .map(r => Object.fromEntries(header.map((h, idx) => [h, (r[idx] ?? '').trim()])))
+}
+
+function rowToVenue(r: Record<string,string>): Venue {
+  const vibes = (r.vibes || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+
+  const price_avg = r.price_avg ? Number(r.price_avg) : undefined
+
+  return {
+    name: r.name,
+    type: r.type,
+    vibes,
+    budget: r.budget,
+    address: r.address,
+    location: r.location,
+    city: r.city,
+    price_avg,
+    imageUrl: r.imageUrl,
+    mapUrl: r.mapUrl,
+  }
+}
+
+/** -------------------------------- Page -------------------------------- **/
 
 export default function Page() {
   return (
@@ -44,13 +103,21 @@ function PageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // Load data
+  // Load data (Google Sheet CSV if set, else local JSON)
   useEffect(() => {
     ;(async () => {
       try {
-        const r = await fetch("/data/venues.json")
-        const j = await r.json()
-        setVenues(j)
+        if (SHEET_CSV) {
+          const r = await fetch(`${SHEET_CSV}${SHEET_CSV.includes('?') ? '&' : '?'}cb=${Date.now()}`, { cache: 'no-store' })
+          const text = await r.text()
+          const rows = parseCSV(text)
+          const parsed = rows.map(rowToVenue).filter(v => v.name && v.type)
+          setVenues(parsed)
+        } else {
+          const r = await fetch("/data/venues.json", { cache: 'no-store' })
+          const j = await r.json()
+          setVenues(j)
+        }
       } finally {
         setLoadingData(false)
       }
@@ -259,6 +326,8 @@ function PageContent() {
   )
 }
 
+/** ---------------- UI bits ---------------- **/
+
 function SaveButton({ id }: { id: string }) {
   const [saved, setSaved] = useState<boolean>(false)
   useEffect(() => {
@@ -306,8 +375,6 @@ function ShareButton() {
     </button>
   )
 }
-
-/** Visual polish bits */
 
 function SkeletonCard() {
   return (
