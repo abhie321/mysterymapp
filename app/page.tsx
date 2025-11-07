@@ -1,8 +1,8 @@
 'use client'
 
 import { Suspense, useEffect, useMemo, useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { MapPin, Sparkles } from "lucide-react"
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
+import { MapPin, Sparkles, SlidersHorizontal } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 
 type Venue = {
@@ -27,7 +27,6 @@ const SHEET_CSV = process.env.NEXT_PUBLIC_SHEET_CSV
 
 /** ---------------- CSV helpers (for Google Sheets publish-to-web CSV) ---------------- **/
 
-// Tiny CSV parser that handles quoted commas/newlines
 function parseCSV(text: string): Record<string, string>[] {
   const rows: string[][] = []
   let row: string[] = ['']
@@ -93,13 +92,18 @@ function PageContent() {
   const [venues, setVenues] = useState<Venue[]>([])
   const [loadingData, setLoadingData] = useState(true)
 
+  // filters / state
   const [vibes, setVibes] = useState<string[]>([])
   const [types, setTypes] = useState<string[]>([])
   const [budget, setBudget] = useState<number>(25)
   const [submitted, setSubmitted] = useState(false)
 
+  // mobile-only: collapsible filters
+  const [filtersOpen, setFiltersOpen] = useState<boolean>(false)
+
   const router = useRouter()
   const searchParams = useSearchParams()
+  const reduceMotion = useReducedMotion()
 
   // Load data (Google Sheet CSV if set, else local JSON)
   useEffect(() => {
@@ -132,6 +136,9 @@ function PageContent() {
     if (t.length) setTypes(t)
     if (!Number.isNaN(b) && b > 0) setBudget(b)
     if (go) setSubmitted(true)
+
+    // default mobile: keep filters collapsed
+    if (typeof window !== 'undefined' && window.innerWidth < 768) setFiltersOpen(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -192,11 +199,34 @@ function PageContent() {
       .slice(0, 12)
   }, [venues, vibes, types, budget])
 
+  // Anim presets honoring reduced motion
+  const motionInitial = reduceMotion ? {} : { opacity: 0, y: 10 }
+  const motionAnimate = reduceMotion ? {} : { opacity: 1, y: 0 }
+  const motionExit = reduceMotion ? {} : { opacity: 0, y: -10 }
+  const motionTransition = { duration: reduceMotion ? 0 : 0.25 }
+
   return (
-    <main className="container pb-16">
+    <main className="container pb-16 ios-smooth">
+      {/* Mobile filters toggle */}
+      <div className="md:hidden flex items-center justify-between mb-2">
+        <button
+          className="btn"
+          onClick={() => setFiltersOpen(o => !o)}
+          aria-expanded={filtersOpen}
+          aria-controls="filters"
+        >
+          <SlidersHorizontal size={16} /> {filtersOpen ? "Hide filters" : "Show filters"}
+        </button>
+        {submitted ? <span className="badge">{results.length} picks</span> : null}
+      </div>
+
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Left controls */}
-        <motion.div layout className="card md:col-span-1">
+        {/* Left controls (collapsible on mobile) */}
+        <motion.div
+          id="filters"
+          layout
+          className={`card md:col-span-1 ${filtersOpen ? '' : 'md:block hidden'}`}
+        >
           <h2 className="text-lg font-semibold mb-3">Your vibe</h2>
 
           <div className="flex flex-wrap gap-2 mb-4">
@@ -239,7 +269,7 @@ function PageContent() {
             </div>
           </div>
 
-          <button onClick={() => setSubmitted(true)} className="btn btn-primary">
+          <button onClick={() => setSubmitted(true)} className="btn btn-primary w-full md:w-auto">
             <Sparkles size={16} /> Show my hidden gems
           </button>
         </motion.div>
@@ -248,10 +278,11 @@ function PageContent() {
         <motion.div layout className="card md:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">Hidden Gems Near You</h2>
-            <div className="flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-2">
               <span className="badge">{submitted ? results.length : 0} picks</span>
               <ShareButton />
             </div>
+            {/* On mobile, Share lives at the bottom via system share */}
           </div>
 
           <AnimatePresence mode="popLayout">
@@ -272,12 +303,12 @@ function PageContent() {
                   <motion.article
                     key={v.venue_id || v.name}
                     layout
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.25 }}
-                    whileHover={{ y: -4 }}
-                    className="group relative overflow-hidden rounded-2xl border border-border"
+                    initial={motionInitial}
+                    animate={motionAnimate}
+                    exit={motionExit}
+                    transition={motionTransition}
+                    whileHover={reduceMotion ? {} : { y: -4 }}
+                    className="group relative overflow-hidden rounded-2xl border border-border will-change-transform"
                   >
                     <div className="relative aspect-[16/10] overflow-hidden">
                       {img ? (
@@ -317,6 +348,13 @@ function PageContent() {
                 <div className="opacity-60 text-subtext">Pick a few vibes and tap “Show my hidden gems”.</div>
               )}
             </div>
+
+            {/* Mobile share button (system share) */}
+            {submitted && !loadingData && (
+              <div className="md:hidden flex justify-end mt-4">
+                <ShareButton mobile />
+              </div>
+            )}
           </AnimatePresence>
         </motion.div>
       </section>
@@ -345,36 +383,46 @@ function SaveButton({ id }: { id: string }) {
         setSaved(true)
       }}
       className={`btn ${saved ? "" : "btn-primary"}`}
+      aria-pressed={saved}
     >
       {saved ? "Saved ✓" : "Save"}
     </button>
   )
 }
 
-function ShareButton() {
+function ShareButton({ mobile = false }: { mobile?: boolean }) {
   const [ok, setOk] = useState(false)
+  const label = mobile ? "Share results" : (ok ? "Copied ✓" : "Share")
+
+  async function doShare() {
+    const url = window.location.href
+    // Prefer native share on iOS/Android
+    if (navigator.share) {
+      try {
+        await navigator.share({ url, title: "MysteryMapp", text: "My hidden gems" })
+        return
+      } catch {
+        // fall through to clipboard
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      setOk(true)
+      setTimeout(() => setOk(false), 1500)
+    } catch {
+      const input = document.createElement("input")
+      input.value = url
+      document.body.appendChild(input)
+      input.select()
+      document.execCommand("copy")
+      document.body.removeChild(input)
+      setOk(true); setTimeout(() => setOk(false), 1500)
+    }
+  }
+
   return (
-    <button
-      className="btn"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(window.location.href)
-          setOk(true)
-          setTimeout(() => setOk(false), 1500)
-        } catch {
-          const input = document.createElement("input")
-          input.value = window.location.href
-          document.body.appendChild(input)
-          input.select()
-          document.execCommand("copy")
-          document.body.removeChild(input)
-          setOk(true)
-          setTimeout(() => setOk(false), 1500)
-        }
-      }}
-      title="Copy a link to these results"
-    >
-      {ok ? "Copied ✓" : "Share"}
+    <button className="btn" onClick={doShare} title="Share these results">
+      {label}
     </button>
   )
 }
@@ -404,7 +452,8 @@ function ImageWithBlur({ src, alt }: { src: string, alt: string }) {
       alt={alt}
       loading="lazy"
       onLoad={() => setLoaded(true)}
-      className={`w-full h-full object-cover transition-transform duration-300 ${loaded ? 'blur-0' : 'blur-sm'} group-hover:scale-[1.03]`}
+      sizes="(max-width: 640px) 100vw, 50vw"
+      className={`w-full h-full object-cover transition-transform duration-300 ${loaded ? 'blur-0' : 'blur-sm'} group-hover:scale-[1.02]`}
     />
   )
 }
