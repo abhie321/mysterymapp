@@ -12,3 +12,17 @@ body { @apply bg-bg text-text; }
 .badge { @apply inline-flex items-center rounded-full bg-border px-2 py-1 text-xs text-subtext; }
 .chip { @apply rounded-full border border-border bg-[#0e1018] px-3 py-1 text-sm text-subtext hover:border-accent transition; }
 .chip-active { @apply border-accent text-text shadow-glow; }
+
+/* iOS smooth scrolling and keyboard-friendly safe area */
+.ios-smooth { -webkit-overflow-scrolling: touch; }
+.safe-pb { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); }
+
+/* Bigger tap targets on mobile (prevents iOS zoom on inputs <16px) */
+.btn { min-height: 44px; }
+.chip { min-height: 36px; }
+input, select, textarea { font-size: 16px; }
+
+/* Reduce motion respect */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+}
