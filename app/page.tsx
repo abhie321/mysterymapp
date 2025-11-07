@@ -27,7 +27,7 @@ const SHEET_CSV = process.env.NEXT_PUBLIC_SHEET_CSV
 
 /** ---------------- CSV helpers (for Google Sheets publish-to-web CSV) ---------------- **/
 
-// Tiny CSV parser that handles quoted commas and newlines.
+// Tiny CSV parser that handles quoted commas/newlines
 function parseCSV(text: string): Record<string, string>[] {
   const rows: string[][] = []
   let row: string[] = ['']
@@ -37,7 +37,6 @@ function parseCSV(text: string): Record<string, string>[] {
   for (let i = 0; i < text.length; i++) {
     const ch = text[i]
     if (ch === '"') {
-      // Handle double quotes inside quoted field ("")
       const next = text[i + 1]
       if (inQuotes && next === '"') { row[col] += '"'; i++; continue }
       inQuotes = !inQuotes
@@ -45,7 +44,6 @@ function parseCSV(text: string): Record<string, string>[] {
     }
     if (ch === ',' && !inQuotes) { row.push(''); col++; continue }
     if ((ch === '\n' || ch === '\r') && !inQuotes) {
-      // swallow \r\n pairs
       if (ch === '\r' && text[i+1] === '\n') i++
       rows.push(row); row = ['']; col = 0; continue
     }
@@ -322,6 +320,11 @@ function PageContent() {
           </AnimatePresence>
         </motion.div>
       </section>
+
+      {/* Mobile sticky CTA */}
+      {!submitted && (
+        <StickyMobileCTA onClick={() => setSubmitted(true)} />
+      )}
     </main>
   )
 }
@@ -401,7 +404,24 @@ function ImageWithBlur({ src, alt }: { src: string, alt: string }) {
       alt={alt}
       loading="lazy"
       onLoad={() => setLoaded(true)}
-      className={`w-full h-full object-cover transition-transform duration-300 ${loaded ? 'blur-0' : 'blur-sm'} group-hover:scale-105`}
+      className={`w-full h-full object-cover transition-transform duration-300 ${loaded ? 'blur-0' : 'blur-sm'} group-hover:scale-[1.03]`}
     />
+  )
+}
+
+function StickyMobileCTA({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 md:hidden bg-[#0e1018]/95 border-t border-border/70 backdrop-blur safe-pb">
+      <div className="container py-2">
+        <button
+          onClick={onClick}
+          disabled={disabled}
+          className="w-full btn btn-primary text-base"
+          aria-label="Show my hidden gems"
+        >
+          <Sparkles size={16} /> Show my hidden gems
+        </button>
+      </div>
+    </div>
   )
 }
