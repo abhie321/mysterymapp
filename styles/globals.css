@@ -27,6 +27,14 @@ input, select, textarea { font-size: 16px; }
   * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }
 
+/* Improve overlay performance on iOS */
+@supports (-webkit-touch-callout: none) {
+  .backdrop-blur-sm { -webkit-backdrop-filter: blur(6px); }
+}
+
+/* Buttons/inputs maintain comfortable size on iOS */
+input, button { font-size: 16px; }
+
 @media (max-width: 420px) {
   form input {
     width: 100% !important;
