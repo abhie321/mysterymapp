@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MapPin, Sparkles } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -37,7 +37,7 @@ export default function Page() {
   const [budget, setBudget] = useState<number>(25)
   const [submitted, setSubmitted] = useState(false)
 
-  // ✅ Load data from Google Sheets JSON
+  // ✅ Load data from Google Sheets API route
   useEffect(() => {
     fetch("/api/venues")
       .then(r => r.json())
@@ -45,7 +45,7 @@ export default function Page() {
       .catch(err => console.error("Failed to load venues:", err))
   }, [])
 
-  // ✅ Read state from URL
+  // ✅ Read from URL
   useEffect(() => {
     const v = searchParams.get("v")?.split(",").filter(Boolean) ?? []
     const t = searchParams.get("t")?.split("|").filter(Boolean) ?? []
@@ -59,7 +59,7 @@ export default function Page() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ✅ Update URL when filters change
+  // ✅ Sync URL with filters
   useEffect(() => {
     const params = new URLSearchParams()
     if (vibes.length) params.set("v", vibes.join(","))
@@ -69,7 +69,7 @@ export default function Page() {
     router.replace(params.toString() ? `/?${params}` : "/", { scroll: false })
   }, [vibes, types, budget, submitted, router])
 
-  // ✅ Get unique vibes from dataset
+  // ✅ Unique vibes from dataset
   const dataVibes = useMemo(() => {
     const s = new Set<string>()
     venues.forEach(v => (v.vibes ?? v.vibe ?? []).forEach(tag => tag && s.add(tag.toLowerCase())))
@@ -77,7 +77,7 @@ export default function Page() {
   }, [venues])
   const ALL_VIBES = dataVibes.length ? dataVibes : [...DEFAULT_VIBES]
 
-  // ✅ Get unique types from dataset
+  // ✅ Unique types from dataset
   const ALL_TYPES = useMemo(() => {
     const s = new Set<string>()
     venues.forEach(v => v.type && s.add(v.type))
@@ -96,7 +96,7 @@ export default function Page() {
       v.address || v.location || (v.name + " " + (v.city || ""))
     )}`
 
-  // ✅ Scoring system for recommendations
+  // ✅ Scoring
   const results = useMemo(() => {
     const score = (venue: Venue) => {
       const rawVibes = (venue.vibes ?? venue.vibe ?? []) as string[]
@@ -116,8 +116,7 @@ export default function Page() {
   }, [venues, vibes, types, budget])
 
   return (
-    <>
-      {/* ✅ New splash waitlist */}
+    <Suspense fallback={<div className="p-8 text-center text-subtext">Loading...</div>}>
       <SplashWaitlist />
 
       <main className="container pb-16 px-3 sm:px-4 md:px-6 max-w-6xl mx-auto">
@@ -240,7 +239,7 @@ export default function Page() {
           </motion.div>
         </section>
       </main>
-    </>
+    </Suspense>
   )
 }
 
