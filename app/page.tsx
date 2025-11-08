@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MapPin, Sparkles } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -29,7 +29,7 @@ const DEFAULT_VIBES = [
   "views","casual","lively","outdoor","classy","bohemian"
 ] as const
 
-export default function Page() {
+function PageContent() {
   const [showSplash, setShowSplash] = useState(true)
   const [venues, setVenues] = useState<Venue[]>([])
   const router = useRouter()
@@ -144,7 +144,6 @@ export default function Page() {
       .slice(0, 12)
   }, [venues, vibes, types, budget])
 
-  // ✅ Show splash screen first
   if (showSplash) {
     return <SplashWaitlist onComplete={() => setShowSplash(false)} />
   }
@@ -266,6 +265,14 @@ export default function Page() {
         </motion.div>
       </section>
     </main>
+  )
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="p-6 text-center text-gray-400">Loading...</div>}>
+      <PageContent />
+    </Suspense>
   )
 }
 
