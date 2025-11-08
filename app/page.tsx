@@ -1,5 +1,6 @@
 'use client'
 
+import SplashWaitlist from "./SplashWaitlist"
 import { Suspense, useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import { MapPin, Sparkles, SlidersHorizontal } from "lucide-react"
