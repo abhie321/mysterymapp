@@ -2,7 +2,6 @@
 import type { Metadata } from "next"
 import "../styles/globals.css"
 import Image from "next/image"
-import WaitlistBar from "./WaitlistBar"
 
 export const metadata: Metadata = {
   title: "MysteryMapp — Hidden Gems Near You",
