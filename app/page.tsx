@@ -26,9 +26,17 @@ type Venue = {
 const DEFAULT_VIBES = [
   "cozy","indie","quiet","vibrant","romantic","retro",
   "artsy","hidden","minimalist","aesthetic","late-night","views","casual"
-] as const;
+] as const
 
 export default function Page() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-subtext">Loading...</div>}>
+      <ClientPage />
+    </Suspense>
+  )
+}
+
+function ClientPage() {
   const [venues, setVenues] = useState<Venue[]>([])
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -37,7 +45,7 @@ export default function Page() {
   const [budget, setBudget] = useState<number>(25)
   const [submitted, setSubmitted] = useState(false)
 
-  // ✅ Load data from Google Sheets API route
+  // ✅ Load data from Google Sheets
   useEffect(() => {
     fetch("/api/venues")
       .then(r => r.json())
@@ -56,10 +64,9 @@ export default function Page() {
     if (t.length) setTypes(t)
     if (!Number.isNaN(b) && b > 0) setBudget(b)
     if (go) setSubmitted(true)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [searchParams])
 
-  // ✅ Sync URL with filters
+  // ✅ Sync URL
   useEffect(() => {
     const params = new URLSearchParams()
     if (vibes.length) params.set("v", vibes.join(","))
@@ -69,7 +76,7 @@ export default function Page() {
     router.replace(params.toString() ? `/?${params}` : "/", { scroll: false })
   }, [vibes, types, budget, submitted, router])
 
-  // ✅ Unique vibes from dataset
+  // ✅ Derived sets
   const dataVibes = useMemo(() => {
     const s = new Set<string>()
     venues.forEach(v => (v.vibes ?? v.vibe ?? []).forEach(tag => tag && s.add(tag.toLowerCase())))
@@ -77,12 +84,11 @@ export default function Page() {
   }, [venues])
   const ALL_VIBES = dataVibes.length ? dataVibes : [...DEFAULT_VIBES]
 
-  // ✅ Unique types from dataset
   const ALL_TYPES = useMemo(() => {
     const s = new Set<string>()
     venues.forEach(v => v.type && s.add(v.type))
     const arr = Array.from(s)
-    return arr.length ? arr : ["Cafe","Bar","Restaurant"]
+    return arr.length ? arr : ["Cafe", "Bar", "Restaurant"]
   }, [venues])
 
   const toggle = (arr: string[], v: string) =>
@@ -96,7 +102,7 @@ export default function Page() {
       v.address || v.location || (v.name + " " + (v.city || ""))
     )}`
 
-  // ✅ Scoring
+  // ✅ Score calculation
   const results = useMemo(() => {
     const score = (venue: Venue) => {
       const rawVibes = (venue.vibes ?? venue.vibe ?? []) as string[]
@@ -116,14 +122,12 @@ export default function Page() {
   }, [venues, vibes, types, budget])
 
   return (
-    <Suspense fallback={<div className="p-8 text-center text-subtext">Loading...</div>}>
+    <>
       <SplashWaitlist />
-
       <main className="container pb-16 px-3 sm:px-4 md:px-6 max-w-6xl mx-auto">
         <section className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           <motion.div layout className="card md:col-span-1 p-4 sm:p-5">
             <h2 className="text-lg font-semibold mb-3">Your vibe</h2>
-
             <div className="flex flex-wrap gap-2 mb-4">
               {ALL_VIBES.map(v => (
                 <button
@@ -239,7 +243,7 @@ export default function Page() {
           </motion.div>
         </section>
       </main>
-    </Suspense>
+    </>
   )
 }
 
