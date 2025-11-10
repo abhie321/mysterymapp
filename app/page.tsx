@@ -1,10 +1,10 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { MapPin, Sparkles } from "lucide-react"
-import { useRouter, useSearchParams } from "next/navigation"
-import SplashWaitlist from "./SplashWaitlist"
+import { useEffect, useMemo, useState, Suspense } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { MapPin, Sparkles } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import SplashWaitlist from './SplashWaitlist'
 
 type Venue = {
   venue_id?: string
@@ -24,13 +24,12 @@ type Venue = {
 }
 
 const DEFAULT_VIBES = [
-  "cozy","indie","quiet","vibrant","romantic","retro",
-  "artsy","hidden","minimalist","aesthetic","late-night",
-  "views","casual","lively","outdoor","classy","bohemian"
+  'cozy', 'indie', 'quiet', 'vibrant', 'romantic', 'retro',
+  'artsy', 'hidden', 'minimalist', 'aesthetic', 'late-night',
+  'views', 'casual', 'lively', 'outdoor', 'classy', 'bohemian'
 ] as const
 
 function PageContent() {
-  const [showSplash, setShowSplash] = useState(true)
   const [venues, setVenues] = useState<Venue[]>([])
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -38,47 +37,53 @@ function PageContent() {
   const [types, setTypes] = useState<string[]>([])
   const [budget, setBudget] = useState<number>(25)
   const [submitted, setSubmitted] = useState(false)
+  const [showSplash, setShowSplash] = useState(true)
 
-  // ✅ Only check localStorage on client
+  // ✅ Handle splash screen persistence
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("waitlistEmail")
-      if (saved) setShowSplash(false)
-    }
+    if (typeof window === 'undefined') return
+    const done = localStorage.getItem('waitlistEmail')
+    if (done) setShowSplash(false)
   }, [])
 
-  // ✅ Fetch from Google Sheet CSV via env variable
+  // ✅ Fetch venues from Google Sheet CSV
   useEffect(() => {
-    const csvUrl = process.env.NEXT_PUBLIC_SHEET_CSV
-    if (!csvUrl) return
-    fetch(csvUrl)
-      .then(r => r.text())
-      .then(text => {
-        const lines = text.split("\n").slice(1)
-        const parsed = lines.map(l => {
-          const parts = l.split(",")
+    const fetchVenues = async () => {
+      try {
+        const csvUrl = process.env.NEXT_PUBLIC_SHEET_CSV
+        if (!csvUrl) return
+        const response = await fetch(csvUrl)
+        const text = await response.text()
+
+        const rows = text.split('\n').slice(1)
+        const parsed = rows.map(line => {
+          const parts = line.split(',')
           return {
             name: parts[0],
             type: parts[1],
             city: parts[2],
             price_avg: Number(parts[3]) || undefined,
-            vibes: parts[4]?.split("|").map(v => v.trim()),
+            vibes: parts[4]?.split('|').map(v => v.trim()) || [],
             address: parts[5],
             image: parts[6],
             mapUrl: parts[7],
           } as Venue
         })
         setVenues(parsed.filter(v => v.name))
-      })
-      .catch(err => console.error("Failed to load venues:", err))
+      } catch (err) {
+        console.error('Failed to load venues:', err)
+      }
+    }
+
+    fetchVenues()
   }, [])
 
-  // ✅ Read initial query from URL
+  // ✅ Parse URL params
   useEffect(() => {
-    const v = searchParams.get("v")?.split(",").filter(Boolean) ?? []
-    const t = searchParams.get("t")?.split("|").filter(Boolean) ?? []
-    const b = Number(searchParams.get("b"))
-    const go = searchParams.get("go") === "1"
+    const v = searchParams.get('v')?.split(',').filter(Boolean) ?? []
+    const t = searchParams.get('t')?.split('|').filter(Boolean) ?? []
+    const b = Number(searchParams.get('b'))
+    const go = searchParams.get('go') === '1'
     if (v.length) setVibes(v)
     if (t.length) setTypes(t)
     if (!Number.isNaN(b) && b > 0) setBudget(b)
@@ -86,17 +91,18 @@ function PageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ✅ Sync state → URL
+  // ✅ Keep URL in sync
   useEffect(() => {
     const params = new URLSearchParams()
-    if (vibes.length) params.set("v", vibes.join(","))
-    if (types.length) params.set("t", types.join("|"))
-    if (budget) params.set("b", String(budget))
-    if (submitted) params.set("go", "1")
+    if (vibes.length) params.set('v', vibes.join(','))
+    if (types.length) params.set('t', types.join('|'))
+    if (budget) params.set('b', String(budget))
+    if (submitted) params.set('go', '1')
     const qs = params.toString()
-    router.replace(qs ? `/?${qs}` : "/", { scroll: false })
+    router.replace(qs ? `/?${qs}` : '/', { scroll: false })
   }, [vibes, types, budget, submitted, router])
 
+  // ✅ Build vibe/type lists
   const dataVibes = useMemo(() => {
     const s = new Set<string>()
     venues.forEach(v => {
@@ -112,7 +118,7 @@ function PageContent() {
     const s = new Set<string>()
     venues.forEach(v => v.type && s.add(v.type))
     const arr = Array.from(s)
-    return arr.length ? arr : ["Cafe","Bar","Restaurant"]
+    return arr.length ? arr : ['Cafe', 'Bar', 'Restaurant']
   }, [venues])
 
   const toggle = (arr: string[], v: string) =>
@@ -123,9 +129,10 @@ function PageContent() {
     v.map_url ||
     v.mapUrl ||
     `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-      v.address || v.location || (v.name + " " + (v.city || ""))
+      v.address || v.location || (v.name + ' ' + (v.city || ''))
     )}`
 
+  // ✅ Filter results
   const results = useMemo(() => {
     const score = (venue: Venue) => {
       const rawVibes = (venue.vibes ?? venue.vibe ?? []) as string[]
@@ -133,7 +140,7 @@ function PageContent() {
       const vibeMatches = vibes.reduce((a, v) => a + (vSet.has(v) ? 1 : 0), 0)
       const vibeScore = Math.min(1, vibeMatches / 2)
       const typeScore = types.length === 0 ? 0.5 : (types.includes(venue.type) ? 1 : 0)
-      const budgetOK = typeof venue.price_avg === "number" ? (venue.price_avg <= budget ? 1 : 0) : 1
+      const budgetOK = typeof venue.price_avg === 'number' ? (venue.price_avg <= budget ? 1 : 0) : 1
       return +(0.6 * vibeScore + 0.25 * typeScore + 0.15 * budgetOK).toFixed(2)
     }
 
@@ -144,9 +151,8 @@ function PageContent() {
       .slice(0, 12)
   }, [venues, vibes, types, budget])
 
-  if (showSplash) {
-    return <SplashWaitlist onComplete={() => setShowSplash(false)} />
-  }
+  // ✅ Splash before anything else
+  if (showSplash) return <SplashWaitlist onComplete={() => setShowSplash(false)} />
 
   return (
     <main className="container pb-16">
@@ -159,7 +165,7 @@ function PageContent() {
               <button
                 key={v}
                 onClick={() => setVibes(prev => toggle(prev, v))}
-                className={`chip ${vibes.includes(v) ? "chip-active" : ""}`}
+                className={`chip ${vibes.includes(v) ? 'chip-active' : ''}`}
               >
                 {v}
               </button>
@@ -186,7 +192,7 @@ function PageContent() {
                 <button
                   key={t}
                   onClick={() => setTypes(prev => toggle(prev, t))}
-                  className={`chip ${types.includes(t) ? "chip-active" : ""}`}
+                  className={`chip ${types.includes(t) ? 'chip-active' : ''}`}
                 >
                   {t}
                 </button>
@@ -210,8 +216,8 @@ function PageContent() {
               {submitted ? results.map(({ v, s }) => {
                 const img = getImage(v)
                 const tags = ((v.vibes ?? v.vibe ?? []) as string[]).slice(0, 3)
-                const price = typeof v.price_avg === "number" ? `$${v.price_avg}` : (v.budget || "")
-                const subtitle = [v.type, price].filter(Boolean).join(" • ")
+                const price = typeof v.price_avg === 'number' ? `$${v.price_avg}` : (v.budget || '')
+                const subtitle = [v.type, price].filter(Boolean).join(' • ')
 
                 return (
                   <motion.article
@@ -279,8 +285,8 @@ export default function Page() {
 function SaveButton({ id }: { id: string }) {
   const [saved, setSaved] = useState<boolean>(false)
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const s = new Set<string>(JSON.parse(localStorage.getItem("mysterymapp_saved") || "[]"))
+    if (typeof window !== 'undefined') {
+      const s = new Set<string>(JSON.parse(localStorage.getItem('mysterymapp_saved') || '[]'))
       setSaved(s.has(id))
     }
   }, [id])
@@ -288,15 +294,15 @@ function SaveButton({ id }: { id: string }) {
   return (
     <button
       onClick={() => {
-        if (typeof window === "undefined") return
-        const s = new Set<string>(JSON.parse(localStorage.getItem("mysterymapp_saved") || "[]"))
+        if (typeof window === 'undefined') return
+        const s = new Set<string>(JSON.parse(localStorage.getItem('mysterymapp_saved') || '[]'))
         s.add(id)
-        localStorage.setItem("mysterymapp_saved", JSON.stringify([...s]))
+        localStorage.setItem('mysterymapp_saved', JSON.stringify([...s]))
         setSaved(true)
       }}
-      className={`btn ${saved ? "" : "btn-primary"}`}
+      className={`btn ${saved ? '' : 'btn-primary'}`}
     >
-      {saved ? "Saved ✓" : "Save"}
+      {saved ? 'Saved ✓' : 'Save'}
     </button>
   )
 }
