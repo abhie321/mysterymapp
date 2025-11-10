@@ -14,7 +14,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://images.weserv.nl" />
         <link rel="preconnect" href="https://drive.google.com" />
       </head>
-      <body>{children}</body>
+      <body className="bg-neutral-950 text-neutral-100 antialiased">
+        {children}
+      </body>
     </html>
   )
 }
