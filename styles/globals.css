@@ -2,41 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Dark color scheme, safe default */
 :root { color-scheme: dark; }
+
 html, body { height: 100%; }
-body { @apply bg-bg text-text; }
-.container { @apply mx-auto max-w-6xl px-4; }
-.card { @apply bg-card border border-border rounded-2xl p-4 shadow; }
-.btn { @apply inline-flex items-center gap-2 rounded-xl border border-accent px-4 py-2 font-semibold text-text; }
-.btn-primary { @apply bg-accent hover:shadow-glow; }
-.badge { @apply inline-flex items-center rounded-full bg-border px-2 py-1 text-xs text-subtext; }
-.chip { @apply rounded-full border border-border bg-[#0e1018] px-3 py-1 text-sm text-subtext hover:border-accent transition; }
-.chip-active { @apply border-accent text-text shadow-glow; }
 
-/* iOS smooth scrolling and keyboard-friendly safe area */
-.ios-smooth { -webkit-overflow-scrolling: touch; }
-.safe-pb { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); }
+/* ---------------- Components (pure Tailwind classes) ---------------- */
+@layer components {
+  /* Page container */
+  .container {
+    @apply mx-auto max-w-6xl px-4;
+  }
 
-/* Bigger tap targets on mobile (prevents iOS zoom on inputs <16px) */
-.btn { min-height: 44px; }
-.chip { min-height: 36px; }
-input, select, textarea { font-size: 16px; }
+  /* Card shell */
+  .card {
+    @apply bg-neutral-900/60 backdrop-blur border border-neutral-800 rounded-2xl p-4 shadow;
+  }
 
-/* Reduce motion respect */
-@media (prefers-reduced-motion: reduce) {
-  * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
-}
+  /* Filter chip */
+  .chip {
+    @apply inline-flex items-center gap-1 px-3 py-1 rounded-full border border-neutral-700 text-sm text-neutral-300 hover:bg-neutral-800 transition;
+  }
+  .chip-active {
+    @apply bg-indigo-600 text-white border-transparent;
+  }
 
-/* Improve overlay performance on iOS */
-@supports (-webkit-touch-callout: none) {
-  .backdrop-blur-sm { -webkit-backdrop-filter: blur(6px); }
-}
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-neutral-700 text-neutral-200 hover:bg-neutral-800 transition;
+  }
+  .btn-primary {
+    @apply bg-indigo-600 text-white border-transparent hover:bg-indigo-500;
+  }
 
-/* Buttons/inputs maintain comfortable size on iOS */
-input, button { font-size: 16px; }
-
-@media (max-width: 420px) {
-  form input {
-    width: 100% !important;
+  /* Small badge/pill */
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-neutral-800 border border-neutral-700 text-neutral-300;
   }
 }
+
+/* You can add any global resets/utilities below if needed */
+/* e.g. smooth scrolling on iOS */
+/* html { scroll-behavior: smooth; } */
