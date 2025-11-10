@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, Suspense } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MapPin, Sparkles } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -29,56 +29,137 @@ const DEFAULT_VIBES = [
   'views', 'casual', 'lively', 'outdoor', 'classy', 'bohemian'
 ] as const
 
+/** ---------- CSV helpers (handles quoted commas) ---------- */
+function smartSplit(line: string): string[] {
+  const out: string[] = []
+  let cur = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
+    } else if (ch === ',' && !inQuotes) {
+      out.push(cur)
+      cur = ''
+    } else {
+      cur += ch
+    }
+  }
+  out.push(cur)
+  return out
+}
+
+function parseCSV(text: string): any[] {
+  const lines = text.replace(/\r/g, '').split('\n').filter(Boolean)
+  if (!lines.length) return []
+  const headers = smartSplit(lines[0]).map(h => h.trim())
+  const rows: any[] = []
+  for (let i = 1; i < lines.length; i++) {
+    const cols = smartSplit(lines[i])
+    const obj: Record<string, string> = {}
+    headers.forEach((h, idx) => (obj[h] = (cols[idx] ?? '').trim()))
+    rows.push(obj)
+  }
+  return rows
+}
+
+function mapRowToVenue(row: any): Venue {
+  // normalize accessor
+  const get = (k: string) => row[k] ?? row[k.toLowerCase()] ?? row[k.replace(/\s+/g, '').toLowerCase()]
+
+  const name    = row.name ?? get('name') ?? get('venue') ?? ''
+  const type    = row.type ?? get('type') ?? ''
+  const city    = row.city ?? get('city') ?? ''
+  const price   = row.price_avg ?? row.price ?? get('price_avg') ?? get('price') ?? ''
+  const vibesRaw= row.vibes ?? row.vibe ?? get('vibes') ?? get('vibe') ?? ''
+  const address = row.address ?? get('address') ?? row.location ?? get('location') ?? ''
+  const image   = row.image ?? get('image') ?? row.imageurl ?? get('imageurl') ?? ''
+  const mapUrl  = row.map_url ?? get('map_url') ?? row.mapurl ?? get('mapurl') ?? ''
+
+  const priceNum = typeof price === 'number'
+    ? price
+    : Number(String(price).replace(/[^0-9.]/g, '')) || undefined
+
+  const vibesArr = Array.isArray(vibesRaw)
+    ? (vibesRaw as string[])
+    : String(vibesRaw || '')
+        .split('|')
+        .map(s => s.trim())
+        .filter(Boolean)
+
+  return {
+    name,
+    type,
+    city,
+    price_avg: priceNum,
+    vibes: vibesArr,
+    address,
+    image,
+    mapUrl,
+  }
+}
+
+/** ---------- Main content (wrapped by Suspense) ---------- */
 function PageContent() {
+  const [showSplash, setShowSplash] = useState(true)
   const [venues, setVenues] = useState<Venue[]>([])
-  const router = useRouter()
-  const searchParams = useSearchParams()
+  const [loadError, setLoadError] = useState<string | null>(null)
+
   const [vibes, setVibes] = useState<string[]>([])
   const [types, setTypes] = useState<string[]>([])
   const [budget, setBudget] = useState<number>(25)
   const [submitted, setSubmitted] = useState(false)
-  const [showSplash, setShowSplash] = useState(true)
 
-  // ✅ Handle splash screen persistence
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Splash persistence (client-only)
   useEffect(() => {
     if (typeof window === 'undefined') return
     const done = localStorage.getItem('waitlistEmail')
     if (done) setShowSplash(false)
   }, [])
 
-  // ✅ Fetch venues from Google Sheet CSV
+  // Robust fetch from NEXT_PUBLIC_SHEET_CSV (JSON or CSV)
   useEffect(() => {
     const fetchVenues = async () => {
+      const url = process.env.NEXT_PUBLIC_SHEET_CSV
+      if (!url) {
+        setLoadError('Missing NEXT_PUBLIC_SHEET_CSV environment variable.')
+        setVenues([])
+        return
+      }
       try {
-        const csvUrl = process.env.NEXT_PUBLIC_SHEET_CSV
-        if (!csvUrl) return
-        const response = await fetch(csvUrl)
-        const text = await response.text()
-
-        const rows = text.split('\n').slice(1)
-        const parsed = rows.map(line => {
-          const parts = line.split(',')
-          return {
-            name: parts[0],
-            type: parts[1],
-            city: parts[2],
-            price_avg: Number(parts[3]) || undefined,
-            vibes: parts[4]?.split('|').map(v => v.trim()) || [],
-            address: parts[5],
-            image: parts[6],
-            mapUrl: parts[7],
-          } as Venue
-        })
-        setVenues(parsed.filter(v => v.name))
-      } catch (err) {
-        console.error('Failed to load venues:', err)
+        const res = await fetch(url, { cache: 'no-store' })
+        const raw = await res.text()
+        const trimmed = raw.trim()
+        let rows: any[] = []
+        if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+          // JSON (e.g., opensheet.elk.sh)
+          const json = JSON.parse(trimmed)
+          rows = Array.isArray(json) ? json : (json?.data ?? [])
+        } else {
+          // CSV
+          rows = parseCSV(raw)
+        }
+        const mapped = rows.map(mapRowToVenue).filter(v => v.name)
+        setVenues(mapped)
+        setLoadError(null)
+      } catch (e: any) {
+        console.error('Failed to load venues:', e)
+        setLoadError('Could not load venues. Please try again later.')
+        setVenues([])
       }
     }
-
     fetchVenues()
   }, [])
 
-  // ✅ Parse URL params
+  // Read initial query from URL (once)
   useEffect(() => {
     const v = searchParams.get('v')?.split(',').filter(Boolean) ?? []
     const t = searchParams.get('t')?.split('|').filter(Boolean) ?? []
@@ -91,18 +172,17 @@ function PageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ✅ Keep URL in sync
+  // Keep URL in sync
   useEffect(() => {
     const params = new URLSearchParams()
     if (vibes.length) params.set('v', vibes.join(','))
     if (types.length) params.set('t', types.join('|'))
     if (budget) params.set('b', String(budget))
     if (submitted) params.set('go', '1')
-    const qs = params.toString()
-    router.replace(qs ? `/?${qs}` : '/', { scroll: false })
+    router.replace(params.toString() ? `/?${params.toString()}` : '/', { scroll: false })
   }, [vibes, types, budget, submitted, router])
 
-  // ✅ Build vibe/type lists
+  // Build options from data
   const dataVibes = useMemo(() => {
     const s = new Set<string>()
     venues.forEach(v => {
@@ -132,7 +212,7 @@ function PageContent() {
       v.address || v.location || (v.name + ' ' + (v.city || ''))
     )}`
 
-  // ✅ Filter results
+  // Scoring + filtering
   const results = useMemo(() => {
     const score = (venue: Venue) => {
       const rawVibes = (venue.vibes ?? venue.vibe ?? []) as string[]
@@ -151,15 +231,19 @@ function PageContent() {
       .slice(0, 12)
   }, [venues, vibes, types, budget])
 
-  // ✅ Splash before anything else
-  if (showSplash) return <SplashWaitlist onComplete={() => setShowSplash(false)} />
+  // Splash (only splash; NO old waitlist bar anywhere)
+  if (showSplash) {
+    return <SplashWaitlist onComplete={() => setShowSplash(false)} />
+  }
 
   return (
     <main className="container pb-16">
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
         <motion.div layout className="card md:col-span-1">
           <h2 className="text-lg font-semibold mb-3">Your vibe</h2>
 
+          {/* Vibes */}
           <div className="flex flex-wrap gap-2 mb-4">
             {ALL_VIBES.map(v => (
               <button
@@ -172,6 +256,7 @@ function PageContent() {
             ))}
           </div>
 
+          {/* Budget */}
           <div className="mb-4">
             <label className="block text-sm text-subtext mb-1">Budget (max per person, $)</label>
             <input
@@ -185,6 +270,7 @@ function PageContent() {
             <div className="text-sm mt-1">${budget}</div>
           </div>
 
+          {/* Types */}
           <div className="mb-4">
             <label className="block text-sm text-subtext mb-1">Type</label>
             <div className="flex flex-wrap gap-2">
@@ -200,9 +286,18 @@ function PageContent() {
             </div>
           </div>
 
-          <button onClick={() => setSubmitted(true)} className="btn btn-primary">
+          <button onClick={() => setSubmitted(true)} className="btn btn-primary w-full md:w-auto">
             <Sparkles size={16} /> Show my hidden gems
           </button>
+
+          {/* Data status (debug-friendly, subtle) */}
+          <div className="mt-3 text-xs text-subtext/70">
+            {loadError ? (
+              <span className="text-red-400">{loadError}</span>
+            ) : (
+              <span>Loaded venues: {venues.length}</span>
+            )}
+          </div>
         </motion.div>
 
         <motion.div layout className="card md:col-span-2">
@@ -213,55 +308,63 @@ function PageContent() {
 
           <AnimatePresence mode="popLayout">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {submitted ? results.map(({ v, s }) => {
-                const img = getImage(v)
-                const tags = ((v.vibes ?? v.vibe ?? []) as string[]).slice(0, 3)
-                const price = typeof v.price_avg === 'number' ? `$${v.price_avg}` : (v.budget || '')
-                const subtitle = [v.type, price].filter(Boolean).join(' • ')
+              {submitted ? (
+                results.length ? (
+                  results.map(({ v, s }) => {
+                    const img = getImage(v)
+                    const tags = ((v.vibes ?? v.vibe ?? []) as string[]).slice(0, 3)
+                    const price = typeof v.price_avg === 'number' ? `$${v.price_avg}` : (v.budget || '')
+                    const subtitle = [v.type, price].filter(Boolean).join(' • ')
 
-                return (
-                  <motion.article
-                    key={v.venue_id || v.name}
-                    layout
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.25 }}
-                    className="relative overflow-hidden rounded-2xl border border-border"
-                  >
-                    <div className="relative aspect-[16/10] overflow-hidden">
-                      {img ? (
-                        <img src={img} alt={v.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-[radial-gradient(circle_at_30%_30%,rgba(58,108,244,0.15),transparent_60%)]" />
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent" />
-                    </div>
+                    return (
+                      <motion.article
+                        key={v.venue_id || v.name}
+                        layout
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.25 }}
+                        className="relative overflow-hidden rounded-2xl border border-border"
+                      >
+                        <div className="relative aspect-[16/10] overflow-hidden">
+                          {img ? (
+                            <img src={img} alt={v.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-[radial-gradient(circle_at_30%_30%,rgba(58,108,244,0.15),transparent_60%)]" />
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent" />
+                        </div>
 
-                    <div className="p-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="font-semibold">{v.name}</h3>
-                        <span className="badge">Score {s}</span>
-                      </div>
-                      <div className="text-sm text-subtext mt-1">{subtitle}</div>
-                      <div className="text-sm text-subtext">{v.address || v.location}</div>
+                        <div className="p-4">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="font-semibold">{v.name}</h3>
+                            <span className="badge">Score {s}</span>
+                          </div>
+                          <div className="text-sm text-subtext mt-1">{subtitle}</div>
+                          <div className="text-sm text-subtext">{v.address || v.location}</div>
 
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {tags.map(tag => (
-                          <span key={tag} className="badge">{tag}</span>
-                        ))}
-                      </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {tags.map(tag => (
+                              <span key={tag} className="badge">{tag}</span>
+                            ))}
+                          </div>
 
-                      <div className="mt-3 flex gap-2">
-                        <a className="btn" href={getMapUrl(v)} target="_blank" rel="noopener">
-                          <MapPin size={16} /> Map
-                        </a>
-                        <SaveButton id={(v.venue_id || v.name).toString()} />
-                      </div>
-                    </div>
-                  </motion.article>
+                          <div className="mt-3 flex gap-2">
+                            <a className="btn" href={getMapUrl(v)} target="_blank" rel="noopener">
+                              <MapPin size={16} /> Map
+                            </a>
+                            <SaveButton id={(v.venue_id || v.name).toString()} />
+                          </div>
+                        </div>
+                      </motion.article>
+                    )
+                  })
+                ) : (
+                  <div className="opacity-60 text-subtext">
+                    No matches yet — try selecting different vibes or increasing your budget.
+                  </div>
                 )
-              }) : (
+              ) : (
                 <div className="opacity-60 text-subtext">
                   Pick a few vibes and tap “Show my hidden gems”.
                 </div>
@@ -274,14 +377,16 @@ function PageContent() {
   )
 }
 
+/** ---------- Wrapper enforces Suspense for useSearchParams ---------- */
 export default function Page() {
   return (
-    <Suspense fallback={<div className="p-6 text-center text-gray-400">Loading...</div>}>
+    <Suspense fallback={<div className="p-6 text-center text-gray-400">Loading…</div>}>
       <PageContent />
     </Suspense>
   )
 }
 
+/** ---------- Save button (client-safe localStorage) ---------- */
 function SaveButton({ id }: { id: string }) {
   const [saved, setSaved] = useState<boolean>(false)
   useEffect(() => {
