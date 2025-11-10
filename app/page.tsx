@@ -6,6 +6,7 @@ import { MapPin, Sparkles } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import SplashWaitlist from './SplashWaitlist'
 
+/* -------------------------- Types -------------------------- */
 type Venue = {
   venue_id?: string
   name: string
@@ -23,13 +24,15 @@ type Venue = {
   imageUrl?: string
 }
 
+/* -------------------- Defaults / constants -------------------- */
 const DEFAULT_VIBES = [
-  'cozy', 'indie', 'quiet', 'vibrant', 'romantic', 'retro',
-  'artsy', 'hidden', 'minimalist', 'aesthetic', 'late-night',
-  'views', 'casual', 'lively', 'outdoor', 'classy', 'bohemian'
+  'cozy','indie','quiet','vibrant','romantic','retro',
+  'artsy','hidden','minimalist','aesthetic','late-night',
+  'views','casual','lively','outdoor','classy','bohemian'
 ] as const
 
-/** ---------- CSV helpers (handles quoted commas) ---------- */
+/* -------------------- CSV helpers (robust) -------------------- */
+// Split respecting quotes, e.g. `"a,b",c` -> ["a,b","c"]
 function smartSplit(line: string): string[] {
   const out: string[] = []
   let cur = ''
@@ -37,23 +40,13 @@ function smartSplit(line: string): string[] {
   for (let i = 0; i < line.length; i++) {
     const ch = line[i]
     if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        cur += '"'
-        i++
-      } else {
-        inQuotes = !inQuotes
-      }
-    } else if (ch === ',' && !inQuotes) {
-      out.push(cur)
-      cur = ''
-    } else {
-      cur += ch
-    }
+      if (inQuotes && line[i + 1] === '"') { cur += '"'; i++ } else { inQuotes = !inQuotes }
+    } else if (ch === ',' && !inQuotes) { out.push(cur); cur = '' }
+    else { cur += ch }
   }
   out.push(cur)
   return out
 }
-
 function parseCSV(text: string): any[] {
   const lines = text.replace(/\r/g, '').split('\n').filter(Boolean)
   if (!lines.length) return []
@@ -68,34 +61,45 @@ function parseCSV(text: string): any[] {
   return rows
 }
 
+/* ----------------- Row→Venue (flexible mapping) ---------------- */
 function mapRowToVenue(row: any): Venue {
-  // normalize accessor
-  const get = (k: string) => row[k] ?? row[k.toLowerCase()] ?? row[k.replace(/\s+/g, '').toLowerCase()]
+  // many sheets change casing/spaces/underscores — normalize
+  const anyKey = (k: string) =>
+    row[k] ??
+    row[k.toLowerCase()] ??
+    row[k.replace(/\s+/g, '').toLowerCase()] ??
+    row[k.replace(/[\s_]/g, '').toLowerCase()]
 
-  const name    = row.name ?? get('name') ?? get('venue') ?? ''
-  const type    = row.type ?? get('type') ?? ''
-  const city    = row.city ?? get('city') ?? ''
-  const price   = row.price_avg ?? row.price ?? get('price_avg') ?? get('price') ?? ''
-  const vibesRaw= row.vibes ?? row.vibe ?? get('vibes') ?? get('vibe') ?? ''
-  const address = row.address ?? get('address') ?? row.location ?? get('location') ?? ''
-  const image   = row.image ?? get('image') ?? row.imageurl ?? get('imageurl') ?? ''
-  const mapUrl  = row.map_url ?? get('map_url') ?? row.mapurl ?? get('mapurl') ?? ''
+  const name    = row.name ?? anyKey('Name') ?? anyKey('Venue') ?? ''
+  const type    = row.type ?? anyKey('Type') ?? ''
+  const city    = row.city ?? anyKey('City') ?? ''
+  const price   = row.price_avg ?? row.price ?? anyKey('Price Avg') ?? anyKey('Price') ?? ''
+
+  const vibesRaw =
+    row.vibes ?? row.vibe ?? anyKey('Vibes') ?? anyKey('Vibe') ?? ''
+
+  // Accept | , or / as separators
+  const vibesArr = Array.isArray(vibesRaw)
+    ? (vibesRaw as string[])
+    : String(vibesRaw || '').split(/[|,/]+/).map(s => s.trim().toLowerCase()).filter(Boolean)
+
+  const address = row.address ?? anyKey('Address') ?? row.location ?? anyKey('Location') ?? ''
+
+  // Handle many image column variants
+  const image =
+    row.image ?? anyKey('Image') ?? anyKey('Image URL') ?? anyKey('Image Link') ??
+    row.imageurl ?? anyKey('image_url') ?? anyKey('img') ?? anyKey('photo') ??
+    anyKey('cover') ?? ''
+
+  const mapUrl =
+    row.map_url ?? anyKey('Map URL') ?? row.mapurl ?? anyKey('Maps Link') ?? ''
 
   const priceNum = typeof price === 'number'
     ? price
     : Number(String(price).replace(/[^0-9.]/g, '')) || undefined
 
-  const vibesArr = Array.isArray(vibesRaw)
-    ? (vibesRaw as string[])
-    : String(vibesRaw || '')
-        .split('|')
-        .map(s => s.trim())
-        .filter(Boolean)
-
   return {
-    name,
-    type,
-    city,
+    name, type, city,
     price_avg: priceNum,
     vibes: vibesArr,
     address,
@@ -104,9 +108,11 @@ function mapRowToVenue(row: any): Venue {
   }
 }
 
-/** ---------- Main content (wrapped by Suspense) ---------- */
+/* ------------------------- Content ------------------------- */
 function PageContent() {
+  // Splash-only (no old waitlist bar anywhere)
   const [showSplash, setShowSplash] = useState(true)
+
   const [venues, setVenues] = useState<Venue[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -118,19 +124,19 @@ function PageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // Splash persistence (client-only)
+  /* Splash persistence */
   useEffect(() => {
     if (typeof window === 'undefined') return
     const done = localStorage.getItem('waitlistEmail')
     if (done) setShowSplash(false)
   }, [])
 
-  // Robust fetch from NEXT_PUBLIC_SHEET_CSV (JSON or CSV)
+  /* Robust fetch from sheet (JSON or CSV; handles quotes/commas) */
   useEffect(() => {
-    const fetchVenues = async () => {
+    const run = async () => {
       const url = process.env.NEXT_PUBLIC_SHEET_CSV
       if (!url) {
-        setLoadError('Missing NEXT_PUBLIC_SHEET_CSV environment variable.')
+        setLoadError('Missing NEXT_PUBLIC_SHEET_CSV env var.')
         setVenues([])
         return
       }
@@ -140,26 +146,24 @@ function PageContent() {
         const trimmed = raw.trim()
         let rows: any[] = []
         if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-          // JSON (e.g., opensheet.elk.sh)
           const json = JSON.parse(trimmed)
           rows = Array.isArray(json) ? json : (json?.data ?? [])
         } else {
-          // CSV
           rows = parseCSV(raw)
         }
         const mapped = rows.map(mapRowToVenue).filter(v => v.name)
         setVenues(mapped)
         setLoadError(null)
-      } catch (e: any) {
+      } catch (e) {
         console.error('Failed to load venues:', e)
         setLoadError('Could not load venues. Please try again later.')
         setVenues([])
       }
     }
-    fetchVenues()
+    run()
   }, [])
 
-  // Read initial query from URL (once)
+  /* Read initial query from URL (once) */
   useEffect(() => {
     const v = searchParams.get('v')?.split(',').filter(Boolean) ?? []
     const t = searchParams.get('t')?.split('|').filter(Boolean) ?? []
@@ -172,7 +176,7 @@ function PageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Keep URL in sync
+  /* Keep URL in sync */
   useEffect(() => {
     const params = new URLSearchParams()
     if (vibes.length) params.set('v', vibes.join(','))
@@ -182,7 +186,7 @@ function PageContent() {
     router.replace(params.toString() ? `/?${params.toString()}` : '/', { scroll: false })
   }, [vibes, types, budget, submitted, router])
 
-  // Build options from data
+  /* Lists for filters */
   const dataVibes = useMemo(() => {
     const s = new Set<string>()
     venues.forEach(v => {
@@ -191,7 +195,6 @@ function PageContent() {
     })
     return Array.from(s).sort()
   }, [venues])
-
   const ALL_VIBES = dataVibes.length ? dataVibes : [...DEFAULT_VIBES]
 
   const ALL_TYPES = useMemo(() => {
@@ -201,10 +204,12 @@ function PageContent() {
     return arr.length ? arr : ['Cafe', 'Bar', 'Restaurant']
   }, [venues])
 
+  /* Helpers */
   const toggle = (arr: string[], v: string) =>
     arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]
 
-  const getImage = (v: Venue) => v.image || v.imageUrl
+  const getImage = (v: Venue) => v.image || v.imageUrl || ''
+
   const getMapUrl = (v: Venue) =>
     v.map_url ||
     v.mapUrl ||
@@ -212,7 +217,7 @@ function PageContent() {
       v.address || v.location || (v.name + ' ' + (v.city || ''))
     )}`
 
-  // Scoring + filtering
+  /* Ranking */
   const results = useMemo(() => {
     const score = (venue: Venue) => {
       const rawVibes = (venue.vibes ?? venue.vibe ?? []) as string[]
@@ -223,7 +228,6 @@ function PageContent() {
       const budgetOK = typeof venue.price_avg === 'number' ? (venue.price_avg <= budget ? 1 : 0) : 1
       return +(0.6 * vibeScore + 0.25 * typeScore + 0.15 * budgetOK).toFixed(2)
     }
-
     return venues
       .map(v => ({ v, s: score(v) }))
       .filter(x => x.s >= 0.4)
@@ -231,11 +235,10 @@ function PageContent() {
       .slice(0, 12)
   }, [venues, vibes, types, budget])
 
-  // Splash (only splash; NO old waitlist bar anywhere)
-  if (showSplash) {
-    return <SplashWaitlist onComplete={() => setShowSplash(false)} />
-  }
+  /* Splash (and only splash) */
+  if (showSplash) return <SplashWaitlist onComplete={() => setShowSplash(false)} />
 
+  /* UI */
   return (
     <main className="container pb-16">
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -290,13 +293,9 @@ function PageContent() {
             <Sparkles size={16} /> Show my hidden gems
           </button>
 
-          {/* Data status (debug-friendly, subtle) */}
+          {/* Debug / status */}
           <div className="mt-3 text-xs text-subtext/70">
-            {loadError ? (
-              <span className="text-red-400">{loadError}</span>
-            ) : (
-              <span>Loaded venues: {venues.length}</span>
-            )}
+            {loadError ? <span className="text-red-400">{loadError}</span> : <>Loaded venues: {venues.length}</>}
           </div>
         </motion.div>
 
@@ -361,7 +360,7 @@ function PageContent() {
                   })
                 ) : (
                   <div className="opacity-60 text-subtext">
-                    No matches yet — try selecting different vibes or increasing your budget.
+                    No matches yet — try different vibes or increase your budget.
                   </div>
                 )
               ) : (
@@ -372,12 +371,13 @@ function PageContent() {
             </div>
           </AnimatePresence>
         </motion.div>
+
       </section>
     </main>
   )
 }
 
-/** ---------- Wrapper enforces Suspense for useSearchParams ---------- */
+/* ------------- Suspense wrapper for useSearchParams ------------- */
 export default function Page() {
   return (
     <Suspense fallback={<div className="p-6 text-center text-gray-400">Loading…</div>}>
@@ -386,7 +386,7 @@ export default function Page() {
   )
 }
 
-/** ---------- Save button (client-safe localStorage) ---------- */
+/* ---------------- Save button (client-safe) ---------------- */
 function SaveButton({ id }: { id: string }) {
   const [saved, setSaved] = useState<boolean>(false)
   useEffect(() => {
