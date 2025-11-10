@@ -63,7 +63,7 @@ function parseCSV(text: string): any[] {
 
 /* ----------------- Row→Venue (flexible mapping) ---------------- */
 function mapRowToVenue(row: any): Venue {
-  // many sheets change casing/spaces/underscores — normalize
+  // normalize key access across casing/spaces/underscores
   const anyKey = (k: string) =>
     row[k] ??
     row[k.toLowerCase()] ??
@@ -108,6 +108,40 @@ function mapRowToVenue(row: any): Venue {
   }
 }
 
+/* ---------------- Image URL normalizer / fallback ---------------- */
+function normalizeImageUrl(raw?: string): string {
+  if (!raw) return ''
+
+  let url = raw.trim()
+
+  // Add scheme if missing
+  if (/^www\./i.test(url)) url = `https://${url}`
+  if (!/^https?:\/\//i.test(url) && !url.startsWith('data:')) return ''
+
+  // Google Drive share → direct view
+  const driveMatch =
+    url.match(/drive\.google\.com\/file\/d\/([^/]+)/) ||
+    url.match(/[?&]id=([^&]+)/)
+  if (driveMatch?.[1]) {
+    const id = driveMatch[1]
+    url = `https://drive.google.com/uc?export=view&id=${id}`
+  }
+
+  // Hosts that often block hotlinking → proxy fallback
+  const host = (() => { try { return new URL(url).host.toLowerCase() } catch { return '' } })()
+  const likelyBlocked = [
+    'photos.google.com',
+    'instagram.com',
+    'scontent.cdninstagram.com',
+  ]
+  if (likelyBlocked.includes(host) || url.includes('photos.google.com')) {
+    const noScheme = url.replace(/^https?:\/\//i, '')
+    url = `https://images.weserv.nl/?url=${encodeURIComponent(noScheme)}&w=1200&h=800&fit=cover&we`
+  }
+
+  return url
+}
+
 /* ------------------------- Content ------------------------- */
 function PageContent() {
   // Splash-only (no old waitlist bar anywhere)
@@ -146,9 +180,11 @@ function PageContent() {
         const trimmed = raw.trim()
         let rows: any[] = []
         if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+          // JSON (e.g., opensheet.elk.sh)
           const json = JSON.parse(trimmed)
           rows = Array.isArray(json) ? json : (json?.data ?? [])
         } else {
+          // CSV
           rows = parseCSV(raw)
         }
         const mapped = rows.map(mapRowToVenue).filter(v => v.name)
@@ -208,7 +244,7 @@ function PageContent() {
   const toggle = (arr: string[], v: string) =>
     arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]
 
-  const getImage = (v: Venue) => v.image || v.imageUrl || ''
+  const getImage = (v: Venue) => normalizeImageUrl(v.image || v.imageUrl || '')
 
   const getMapUrl = (v: Venue) =>
     v.map_url ||
@@ -235,7 +271,7 @@ function PageContent() {
       .slice(0, 12)
   }, [venues, vibes, types, budget])
 
-  /* Splash (and only splash) */
+  /* Splash (only splash; old waitlist bar is gone) */
   if (showSplash) return <SplashWaitlist onComplete={() => setShowSplash(false)} />
 
   /* UI */
@@ -327,7 +363,27 @@ function PageContent() {
                       >
                         <div className="relative aspect-[16/10] overflow-hidden">
                           {img ? (
-                            <img src={img} alt={v.name} className="w-full h-full object-cover" />
+                            <img
+                              src={img}
+                              alt={v.name}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                const el = e.currentTarget as HTMLImageElement
+                                // One attempt to proxy if not already proxied
+                                if (!el.dataset.fallback) {
+                                  el.dataset.fallback = '1'
+                                  const noScheme = (el.src || '').replace(/^https?:\/\//i, '')
+                                  el.src = `https://images.weserv.nl/?url=${encodeURIComponent(noScheme)}&w=1200&h=800&fit=cover&we`
+                                } else {
+                                  // Final graceful fallback: show gradient block
+                                  el.style.display = 'none'
+                                  const parent = el.parentElement
+                                  if (parent) parent.innerHTML = `<div class="w-full h-full bg-[radial-gradient(circle_at_30%_30%,rgba(58,108,244,0.15),transparent_60%)]"></div>`
+                                }
+                              }}
+                            />
                           ) : (
                             <div className="w-full h-full bg-[radial-gradient(circle_at_30%_30%,rgba(58,108,244,0.15),transparent_60%)]" />
                           )}
