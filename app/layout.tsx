@@ -1,5 +1,5 @@
 // app/layout.tsx
-import './styles/globals.css'
+import '../styles/globals.css'   // <-- fixed path (was ./styles/... and failed)
 
 export const metadata = {
   title: 'MysteryMapp',
