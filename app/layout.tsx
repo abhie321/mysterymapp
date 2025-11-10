@@ -1,5 +1,5 @@
 // app/layout.tsx
-import '../styles/globals.css'   // <-- fixed path (was ./styles/... and failed)
+import '../styles/globals.css'
 
 export const metadata = {
   title: 'MysteryMapp',
@@ -9,6 +9,11 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        {/* Speed up first image fetches */}
+        <link rel="preconnect" href="https://images.weserv.nl" />
+        <link rel="preconnect" href="https://drive.google.com" />
+      </head>
       <body>{children}</body>
     </html>
   )
