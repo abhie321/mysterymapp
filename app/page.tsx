@@ -61,46 +61,67 @@ function parseCSV(text: string): any[] {
   return rows
 }
 
+/* -------- Flexible key lookup (matches row keys safely) ------- */
+// Normalize a key by stripping non-alphanumerics and lowercasing
+const norm = (s: string) => s.replace(/[^a-z0-9]/gi, '').toLowerCase()
+
+// Find the first matching value in the row for any of the provided key variants.
+// This matches case-insensitively and ignores punctuation/underscores/spaces,
+// so 'imageUrl', 'Image URL', 'image_url', 'imageurl' all match each other.
+function getAny(row: Record<string, any>, ...candidates: string[]): any {
+  const table: Record<string, string> = {}
+  for (const k of Object.keys(row)) table[norm(k)] = k
+  for (const c of candidates) {
+    const nk = norm(c)
+    if (nk in table) return row[table[nk]]
+  }
+  return undefined
+}
+
 /* ----------------- Row→Venue (flexible mapping) ---------------- */
 function mapRowToVenue(row: any): Venue {
-  // normalize key access across casing/spaces/underscores
-  const anyKey = (k: string) =>
-    row[k] ??
-    row[k.toLowerCase()] ??
-    row[k.replace(/\s+/g, '').toLowerCase()] ??
-    row[k.replace(/[\s_]/g, '').toLowerCase()]
+  // Basic fields
+  const name = getAny(row, 'name', 'venue') ?? ''
+  const type = getAny(row, 'type') ?? ''
+  const city = getAny(row, 'city') ?? ''
 
-  const name    = row.name ?? anyKey('Name') ?? anyKey('Venue') ?? ''
-  const type    = row.type ?? anyKey('Type') ?? ''
-  const city    = row.city ?? anyKey('City') ?? ''
-  const price   = row.price_avg ?? row.price ?? anyKey('Price Avg') ?? anyKey('Price') ?? ''
+  // Price
+  const price = getAny(row, 'price_avg', 'price', 'avg price', 'price per person', 'pp') ?? ''
+  const price_num =
+    typeof price === 'number'
+      ? price
+      : Number(String(price).replace(/[^0-9.]/g, '')) || undefined
 
-  const vibesRaw =
-    row.vibes ?? row.vibe ?? anyKey('Vibes') ?? anyKey('Vibe') ?? ''
-
-  // Accept | , or / as separators
+  // Vibes (support "vibes", "vibe"; split on | , /)
+  const vibesRaw = getAny(row, 'vibes', 'vibe') ?? ''
   const vibesArr = Array.isArray(vibesRaw)
     ? (vibesRaw as string[])
-    : String(vibesRaw || '').split(/[|,/]+/).map(s => s.trim().toLowerCase()).filter(Boolean)
+    : String(vibesRaw || '')
+        .split(/[|,/]+/)
+        .map(s => s.trim().toLowerCase())
+        .filter(Boolean)
 
-  const address = row.address ?? anyKey('Address') ?? row.location ?? anyKey('Location') ?? ''
+  // Address / location
+  const address = getAny(row, 'address', 'location') ?? ''
 
-  // Handle many image column variants
-  const image =
-    row.image ?? anyKey('Image') ?? anyKey('Image URL') ?? anyKey('Image Link') ??
-    row.imageurl ?? anyKey('image_url') ?? anyKey('img') ?? anyKey('photo') ??
-    anyKey('cover') ?? ''
+  // Image (support image, imageUrl, image url, photo, cover, img)
+  const image = getAny(
+    row,
+    'image', 'imageUrl', 'image url', 'image link',
+    'image_url', 'img', 'photo', 'cover'
+  ) ?? ''
 
-  const mapUrl =
-    row.map_url ?? anyKey('Map URL') ?? row.mapurl ?? anyKey('Maps Link') ?? ''
-
-  const priceNum = typeof price === 'number'
-    ? price
-    : Number(String(price).replace(/[^0-9.]/g, '')) || undefined
+  // Maps link (support mapUrl, map url, map_url, maps link)
+  const mapUrl = getAny(
+    row,
+    'map_url', 'mapUrl', 'map url', 'maps link', 'google maps'
+  ) ?? ''
 
   return {
-    name, type, city,
-    price_avg: priceNum,
+    name,
+    type,
+    city,
+    price_avg: price_num,
     vibes: vibesArr,
     address,
     image,
@@ -112,7 +133,7 @@ function mapRowToVenue(row: any): Venue {
 function normalizeImageUrl(raw?: string): string {
   if (!raw) return ''
 
-  let url = raw.trim()
+  let url = String(raw).trim()
 
   // Add scheme if missing
   if (/^www\./i.test(url)) url = `https://${url}`
