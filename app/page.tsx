@@ -32,7 +32,6 @@ const DEFAULT_VIBES = [
 ] as const
 
 /* -------------------- CSV helpers (robust) -------------------- */
-// Split respecting quotes, e.g. `"a,b",c` -> ["a,b","c"]
 function smartSplit(line: string): string[] {
   const out: string[] = []
   let cur = ''
@@ -62,12 +61,7 @@ function parseCSV(text: string): any[] {
 }
 
 /* -------- Flexible key lookup (matches row keys safely) ------- */
-// Normalize a key by stripping non-alphanumerics and lowercasing
 const norm = (s: string) => s.replace(/[^a-z0-9]/gi, '').toLowerCase()
-
-// Find the first matching value in the row for any of the provided key variants.
-// This matches case-insensitively and ignores punctuation/underscores/spaces,
-// so 'imageUrl', 'Image URL', 'image_url', 'imageurl' all match each other.
 function getAny(row: Record<string, any>, ...candidates: string[]): any {
   const table: Record<string, string> = {}
   for (const k of Object.keys(row)) table[norm(k)] = k
@@ -80,19 +74,16 @@ function getAny(row: Record<string, any>, ...candidates: string[]): any {
 
 /* ----------------- Row→Venue (flexible mapping) ---------------- */
 function mapRowToVenue(row: any): Venue {
-  // Basic fields
   const name = getAny(row, 'name', 'venue') ?? ''
   const type = getAny(row, 'type') ?? ''
   const city = getAny(row, 'city') ?? ''
 
-  // Price
   const price = getAny(row, 'price_avg', 'price', 'avg price', 'price per person', 'pp') ?? ''
   const price_num =
     typeof price === 'number'
       ? price
       : Number(String(price).replace(/[^0-9.]/g, '')) || undefined
 
-  // Vibes (support "vibes", "vibe"; split on | , /)
   const vibesRaw = getAny(row, 'vibes', 'vibe') ?? ''
   const vibesArr = Array.isArray(vibesRaw)
     ? (vibesRaw as string[])
@@ -101,20 +92,17 @@ function mapRowToVenue(row: any): Venue {
         .map(s => s.trim().toLowerCase())
         .filter(Boolean)
 
-  // Address / location
   const address = getAny(row, 'address', 'location') ?? ''
 
-  // Image (support image, imageUrl, image url, photo, cover, img)
   const image = getAny(
     row,
-    'image', 'imageUrl', 'image url', 'image link',
-    'image_url', 'img', 'photo', 'cover'
+    'image','imageUrl','image url','image link',
+    'image_url','img','photo','cover'
   ) ?? ''
 
-  // Maps link (support mapUrl, map url, map_url, maps link)
   const mapUrl = getAny(
     row,
-    'map_url', 'mapUrl', 'map url', 'maps link', 'google maps'
+    'map_url','mapUrl','map url','maps link','google maps'
   ) ?? ''
 
   return {
@@ -132,14 +120,11 @@ function mapRowToVenue(row: any): Venue {
 /* ---------------- Image URL normalizer / fallback ---------------- */
 function normalizeImageUrl(raw?: string): string {
   if (!raw) return ''
-
   let url = String(raw).trim()
 
-  // Add scheme if missing
   if (/^www\./i.test(url)) url = `https://${url}`
   if (!/^https?:\/\//i.test(url) && !url.startsWith('data:')) return ''
 
-  // Google Drive share → direct view
   const driveMatch =
     url.match(/drive\.google\.com\/file\/d\/([^/]+)/) ||
     url.match(/[?&]id=([^&]+)/)
@@ -148,24 +133,17 @@ function normalizeImageUrl(raw?: string): string {
     url = `https://drive.google.com/uc?export=view&id=${id}`
   }
 
-  // Hosts that often block hotlinking → proxy fallback
   const host = (() => { try { return new URL(url).host.toLowerCase() } catch { return '' } })()
-  const likelyBlocked = [
-    'photos.google.com',
-    'instagram.com',
-    'scontent.cdninstagram.com',
-  ]
+  const likelyBlocked = ['photos.google.com','instagram.com','scontent.cdninstagram.com']
   if (likelyBlocked.includes(host) || url.includes('photos.google.com')) {
     const noScheme = url.replace(/^https?:\/\//i, '')
     url = `https://images.weserv.nl/?url=${encodeURIComponent(noScheme)}&w=1200&h=800&fit=cover&we`
   }
-
   return url
 }
 
 /* ------------------------- Content ------------------------- */
 function PageContent() {
-  // Splash-only (no old waitlist bar anywhere)
   const [showSplash, setShowSplash] = useState(true)
 
   const [venues, setVenues] = useState<Venue[]>([])
@@ -186,7 +164,7 @@ function PageContent() {
     if (done) setShowSplash(false)
   }, [])
 
-  /* Robust fetch from sheet (JSON or CSV; handles quotes/commas) */
+  /* Fetch from sheet (JSON or CSV) */
   useEffect(() => {
     const run = async () => {
       const url = process.env.NEXT_PUBLIC_SHEET_CSV
@@ -201,15 +179,19 @@ function PageContent() {
         const trimmed = raw.trim()
         let rows: any[] = []
         if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-          // JSON (e.g., opensheet.elk.sh)
           const json = JSON.parse(trimmed)
           rows = Array.isArray(json) ? json : (json?.data ?? [])
         } else {
-          // CSV
           rows = parseCSV(raw)
         }
         const mapped = rows.map(mapRowToVenue).filter(v => v.name)
-        setVenues(mapped)
+
+        // De-dup by name to keep sheet robust
+        const deduped = Array.from(
+          new Map(mapped.map(m => [m.name.toLowerCase(), m])).values()
+        )
+
+        setVenues(deduped)
         setLoadError(null)
       } catch (e) {
         console.error('Failed to load venues:', e)
@@ -233,14 +215,17 @@ function PageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /* Keep URL in sync */
+  /* Debounced URL sync (nicer UX) */
   useEffect(() => {
-    const params = new URLSearchParams()
-    if (vibes.length) params.set('v', vibes.join(','))
-    if (types.length) params.set('t', types.join('|'))
-    if (budget) params.set('b', String(budget))
-    if (submitted) params.set('go', '1')
-    router.replace(params.toString() ? `/?${params.toString()}` : '/', { scroll: false })
+    const t = setTimeout(() => {
+      const params = new URLSearchParams()
+      if (vibes.length) params.set('v', vibes.join(','))
+      if (types.length) params.set('t', types.join('|'))
+      if (budget) params.set('b', String(budget))
+      if (submitted) params.set('go', '1')
+      router.replace(params.toString() ? `/?${params.toString()}` : '/', { scroll: false })
+    }, 200)
+    return () => clearTimeout(t)
   }, [vibes, types, budget, submitted, router])
 
   /* Lists for filters */
@@ -297,7 +282,7 @@ function PageContent() {
 
   /* UI */
   return (
-    <main className="container pb-16">
+    <main className="container pb-16 pt-[env(safe-area-inset-top)] px-3 sm:px-4">
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
         <motion.div layout className="card md:col-span-1">
@@ -305,15 +290,20 @@ function PageContent() {
 
           {/* Vibes */}
           <div className="flex flex-wrap gap-2 mb-4">
-            {ALL_VIBES.map(v => (
-              <button
-                key={v}
-                onClick={() => setVibes(prev => toggle(prev, v))}
-                className={`chip ${vibes.includes(v) ? 'chip-active' : ''}`}
-              >
-                {v}
-              </button>
-            ))}
+            {ALL_VIBES.map(v => {
+              const active = vibes.includes(v)
+              return (
+                <button
+                  key={v}
+                  onClick={() => setVibes(prev => toggle(prev, v))}
+                  className={`chip ${active ? 'chip-active' : ''}`}
+                  aria-pressed={active}
+                  role="switch"
+                >
+                  {v}
+                </button>
+              )
+            })}
           </div>
 
           {/* Budget */}
@@ -334,15 +324,20 @@ function PageContent() {
           <div className="mb-4">
             <label className="block text-sm text-subtext mb-1">Type</label>
             <div className="flex flex-wrap gap-2">
-              {ALL_TYPES.map(t => (
-                <button
-                  key={t}
-                  onClick={() => setTypes(prev => toggle(prev, t))}
-                  className={`chip ${types.includes(t) ? 'chip-active' : ''}`}
-                >
-                  {t}
-                </button>
-              ))}
+              {ALL_TYPES.map(t => {
+                const active = types.includes(t)
+                return (
+                  <button
+                    key={t}
+                    onClick={() => setTypes(prev => toggle(prev, t))}
+                    className={`chip ${active ? 'chip-active' : ''}`}
+                    aria-pressed={active}
+                    role="switch"
+                  >
+                    {t}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
@@ -389,16 +384,15 @@ function PageContent() {
                               alt={v.name}
                               className="w-full h-full object-cover"
                               loading="lazy"
+                              decoding="async"
                               referrerPolicy="no-referrer"
                               onError={(e) => {
                                 const el = e.currentTarget as HTMLImageElement
-                                // One attempt to proxy if not already proxied
                                 if (!el.dataset.fallback) {
                                   el.dataset.fallback = '1'
                                   const noScheme = (el.src || '').replace(/^https?:\/\//i, '')
                                   el.src = `https://images.weserv.nl/?url=${encodeURIComponent(noScheme)}&w=1200&h=800&fit=cover&we`
                                 } else {
-                                  // Final graceful fallback: show gradient block
                                   el.style.display = 'none'
                                   const parent = el.parentElement
                                   if (parent) parent.innerHTML = `<div class="w-full h-full bg-[radial-gradient(circle_at_30%_30%,rgba(58,108,244,0.15),transparent_60%)]"></div>`
@@ -463,7 +457,7 @@ export default function Page() {
   )
 }
 
-/* ---------------- Save button (client-safe) ---------------- */
+/* ---------------- Save button (toggle on/off) ---------------- */
 function SaveButton({ id }: { id: string }) {
   const [saved, setSaved] = useState<boolean>(false)
   useEffect(() => {
@@ -477,12 +471,14 @@ function SaveButton({ id }: { id: string }) {
     <button
       onClick={() => {
         if (typeof window === 'undefined') return
-        const s = new Set<string>(JSON.parse(localStorage.getItem('mysterymapp_saved') || '[]'))
-        s.add(id)
+        const arr: string[] = JSON.parse(localStorage.getItem('mysterymapp_saved') || '[]')
+        const s = new Set(arr)
+        if (s.has(id)) { s.delete(id); setSaved(false) } else { s.add(id); setSaved(true) }
         localStorage.setItem('mysterymapp_saved', JSON.stringify([...s]))
-        setSaved(true)
       }}
       className={`btn ${saved ? '' : 'btn-primary'}`}
+      aria-pressed={saved}
+      role="switch"
     >
       {saved ? 'Saved ✓' : 'Save'}
     </button>
